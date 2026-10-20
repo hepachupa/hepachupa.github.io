@@ -256,7 +256,7 @@ dialog::backdrop { background: rgb(0 0 0 / .6); backdrop-filter: blur(3px); }
 .prose h2 { font-size: 19px; margin: 28px 0 8px; letter-spacing: -0.01em; }
 .prose h3 { font-size: 16px; margin: 22px 0 6px; }
 .prose p { margin: 0 0 12px; }
-.prose img { border-radius: 10px; border: 1px solid var(--border); margin: 12px 0; }
+.prose img { display: block; width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--border); margin: 12px 0; }
 .prose code { font-family: ui-monospace, 'JetBrains Mono', Menlo, monospace; font-size: .9em; background: var(--surface-2); padding: 1px 5px; border-radius: 5px; }
 .prose pre { background: #0b0b0e !important; border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font-size: 13px; line-height: 1.55; }
 .prose pre code { background: none; padding: 0; }
