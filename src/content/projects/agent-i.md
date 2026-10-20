@@ -18,8 +18,6 @@ highlights:
 video: https://youtu.be/wx33X7C4dhs
 gallery: []
 links:
-  - label: itch.io에서 플레이
-    url: https://dasoya.itch.io/agenti
   - label: GitHub (클라이언트)
     url: https://github.com/hepachupa/Frontend_Demo
 ---
