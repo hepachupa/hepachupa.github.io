@@ -3,8 +3,9 @@ import { getCollection } from 'astro:content';
 import Base from '../layouts/Base.astro';
 import Card from '../components/Card.astro';
 import Detail from '../components/Detail.astro';
+import Video from '../components/Video.astro';
 import profile from '../data/profile.json';
-import { KIND_LABEL, asset, youtubeId, fmtMonth, period, type Kind } from '../lib/util';
+import { KIND_LABEL, asset, fmtMonth, period, type Kind } from '../lib/util';
 
 const load = async (name: 'projects' | 'awards' | 'activities', kind: Kind) =>
   (await getCollection(name)).filter((e) => !e.data.hidden).map((e) => ({
@@ -24,7 +25,7 @@ all.forEach((i) => i.data.tags.forEach((t: string) => tagCount.set(t, (tagCount.
 const tags = [...tagCount.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ko'));
 
 const counts = { project: projects.length, award: awards.length, activity: activities.length };
-const ref = (i: (typeof all)[number]) => ({ uid: i.uid, title: i.data.title, kind: i.kind, when: period(i.data), result: i.data.result });
+const ref = (i: (typeof all)[number]) => ({ uid: i.uid, title: i.data.title, kind: i.kind, when: i.data.hide_dates ? '' : period(i.data), result: i.data.result });
 const relatedOf = (i: (typeof all)[number]) => {
   if (i.kind === 'project' || !i.data.related) return undefined;
   const p = projects.find((p) => p.id === i.data.related);
@@ -41,7 +42,6 @@ for (const item of all) {
   rows.push({ item });
 }
 
-const heroYt = youtubeId(profile.hero_video);
 const now = new Date();
 const updated = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
 ---
@@ -77,16 +77,7 @@ const updated = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
           ))}
         </ul>
       </div>
-      {heroYt ? (
-        <div class="hero-media video" data-yt={heroYt}>
-          <button type="button" class="yt-play" aria-label="대표 영상 재생">
-            <img src={`https://i.ytimg.com/vi/${heroYt}/hqdefault.jpg`} alt="" />
-            <span class="play">▶</span>
-          </button>
-        </div>
-      ) : profile.hero_video ? (
-        <video class="hero-media" src={asset(profile.hero_video)} autoplay muted loop playsinline preload="metadata"></video>
-      ) : null}
+      {profile.hero_video && <Video url={profile.hero_video} class="hero-media" autoplayFile />}
     </section>
 
     {profile.skills?.length > 0 && (
@@ -236,10 +227,9 @@ const updated = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
 
     // ── 유튜브 지연 로드 (클릭 전엔 썸네일만) ──
     function bindVideos(root: ParentNode) {
-      $$<HTMLElement>('[data-yt] .yt-play', root).forEach((btn) => btn.addEventListener('click', () => {
-        const id = btn.parentElement!.dataset.yt;
+      $$<HTMLElement>('[data-embed] .yt-play', root).forEach((btn) => btn.addEventListener('click', () => {
         const f = document.createElement('iframe');
-        f.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`;
+        f.src = btn.parentElement!.dataset.embed!;
         f.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
         f.allowFullscreen = true;
         f.title = '영상';

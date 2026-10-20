@@ -19,6 +19,7 @@ const item = z.object({
   ongoing: z.boolean().optional().default(false),
   featured: z.boolean().optional().default(false),
   hidden: z.boolean().optional().default(false),
+  hide_dates: z.boolean().optional().default(false), // 기간 표시 안 함 (정렬에는 사용)
   tags: z.array(z.string()).optional().nullable().transform((v) => v ?? []),
   thumbnail: optStr,
   // 프로젝트
@@ -27,6 +28,7 @@ const item = z.object({
   contribution: optStr,
   highlights: z.array(z.string()).optional().nullable().transform((v) => v ?? []),
   video: optStr,
+  videos: z.array(z.string()).optional().nullable().transform((v) => (v ?? []).filter(Boolean)), // 추가 영상
   gallery: z.array(z.string()).optional().nullable().transform((v) => v ?? []),
   links: z.array(link).optional().nullable().transform((v) => v ?? []),
   // 수상

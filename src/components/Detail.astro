@@ -1,15 +1,15 @@
 ---
 import { render } from 'astro:content';
-import { KIND_LABEL, period, asset, youtubeId, type Kind } from '../lib/util';
+import { KIND_LABEL, period, asset, type Kind } from '../lib/util';
+import Video from './Video.astro';
 interface Ref { uid: string; title: string; kind: Kind; when: string; result?: string }
 interface Props { item: any; related?: Ref; backrefs?: Ref[] }
 const { item, related, backrefs = [] } = Astro.props;
 const d = item.data;
 const kind: Kind = item.kind;
 const { Content } = await render(item);
-const yt = youtubeId(d.video);
 const facts: [string, string | undefined][] = [
-  ['기간', period(d)],
+  ['기간', d.hide_dates ? undefined : period(d)],
   ['역할', d.role],
   ['팀', d.team],
   ['기여', d.contribution],
@@ -25,18 +25,15 @@ const facts: [string, string | undefined][] = [
     {d.summary && <p class="lead">{d.summary}</p>}
   </header>
 
-  {yt ? (
-    <div class="video" data-yt={yt}>
-      <button type="button" class="yt-play" aria-label="영상 재생">
-        <img src={`https://i.ytimg.com/vi/${yt}/hqdefault.jpg`} alt="" loading="lazy" />
-        <span class="play">▶</span>
-      </button>
-    </div>
-  ) : d.video ? (
-    <video class="video-file" src={asset(d.video)} controls preload="none" playsinline></video>
+  {d.video ? (
+    <Video url={d.video} />
   ) : d.thumbnail ? (
     <img class="cover" src={asset(d.thumbnail)} alt="" loading="lazy" />
   ) : null}
+
+  {d.videos.length > 0 && (
+    <div class="more-videos">{d.videos.map((u: string) => <Video url={u} />)}</div>
+  )}
 
   <dl class="facts">
     {facts.filter(([, v]) => v).map(([k, v]) => (<div><dt>{k}</dt><dd>{v}</dd></div>))}

@@ -8,17 +8,22 @@ featured: true
 tags: [Unity 6, C#, URP, Cinemachine, Spine, FMOD, Dialogue System, Steamworks, AI 활용, 팀 프로젝트]
 thumbnail: ""
 role: 메인 클라이언트 개발 (프로그래밍 리드)
-team: 검귤단
+team: 검귤단 (Black Tangerine)
 contribution: ""
 highlights:
-  - TOEI와 퍼블리싱 계약 체결 — 인디 프로젝트를 상용 출시 단계까지 끌어올림
+  - 2026년 3월 TOEI와 퍼블리싱 계약 체결 — 인디 프로젝트를 상용 출시 단계까지 끌어올림
+  - Steam 데모 공개, 한국어·영어·일본어·중국어 간체/번체 5개 언어 지원
   - GIGDC 일반부문 대상 · SQOOL Award 대상 · 반다이남코 GYAAR Studio Award 2등 등 수상·선정 13건
   - 출시 파이프라인 직접 구축 — 씬 최적화, Normal/GameShow/QA 3종 빌드, Steamworks 연동, QA 전용 빌드·툴
   - Unity MCP로 AI 에이전트를 에디터에 연결해 최적화 감사·리팩터링·QA 툴 제작에 활용하고, 도구의 한계를 문서화해 팀 워크플로로 정립
   - Bootstrap 씬 + 전역 매니저 14종 안정화 감사, 세이브/로드 전면 개편
-video: ""
+video: https://www.youtube.com/watch?v=tFxTB1mJmiE
 gallery: []
 links:
+  - label: Steam
+    url: https://store.steampowered.com/app/2524200/KILLA/
+  - label: 퍼블리셔 TOEI GAMES
+    url: https://store.steampowered.com/publisher/toeigames
   - label: GitHub
     url: https://github.com/hepachupa
 ---
@@ -29,7 +34,7 @@ Unity 6 (URP) · C# · PixelCrushers Dialogue System / Save System (Lua 변수) 
 
 ## 퍼블리싱: 인디 프로젝트에서 상용 출시로
 
-교내 지원사업과 공모전으로 시작한 KILLA는 국내외 수상·선정 13건으로 완성도를 검증받았고, **TOEI와 퍼블리싱 계약**을 맺었습니다. 퍼블리셔와 일하면서 "재미있는 데모"가 아니라 **일정 안에 안정적으로 출시되는 빌드**를 만드는 것이 클라이언트 개발자의 일이 되었습니다. 아래는 그 과정에서 맡은 일입니다.
+교내 지원사업과 공모전으로 시작한 KILLA는 국내외 수상·선정 13건으로 완성도를 검증받았고, 2026년 3월 **TOEI와 퍼블리싱 계약**을 맺었습니다. 퍼블리셔와 일하면서 "재미있는 데모"가 아니라 **일정 안에 안정적으로 출시되는 빌드**를 만드는 것이 클라이언트 개발자의 일이 되었습니다. 아래는 그 과정에서 맡은 일입니다.
 
 ## 1. 최적화
 

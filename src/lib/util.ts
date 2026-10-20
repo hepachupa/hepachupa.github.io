@@ -30,3 +30,22 @@ export function youtubeId(url?: string) {
   const m = url.match(/(?:youtu\.be\/|v=|embed\/|shorts\/)([\w-]{11})/);
   return m?.[1];
 }
+
+export function driveId(url?: string) {
+  if (!url) return undefined;
+  const m = url.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:export=\w+&)?id=)([\w-]{20,})/);
+  return m?.[1];
+}
+
+/** 영상 주소 → 화면에 그릴 방식. 유튜브·구글 드라이브는 클릭 전까지 썸네일만 */
+export function videoSource(url?: string):
+  | { kind: 'embed'; embed: string; thumb: string; label: string }
+  | { kind: 'file'; src: string }
+  | undefined {
+  if (!url) return undefined;
+  const yt = youtubeId(url);
+  if (yt) return { kind: 'embed', embed: `https://www.youtube-nocookie.com/embed/${yt}?autoplay=1&rel=0`, thumb: `https://i.ytimg.com/vi/${yt}/hqdefault.jpg`, label: 'YouTube' };
+  const dr = driveId(url);
+  if (dr) return { kind: 'embed', embed: `https://drive.google.com/file/d/${dr}/preview`, thumb: `https://drive.google.com/thumbnail?id=${dr}&sz=w1280`, label: 'Google Drive' };
+  return { kind: 'file', src: asset(url)! };
+}

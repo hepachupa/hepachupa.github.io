@@ -26,7 +26,7 @@ const meta = kind === 'award' ? [d.organizer, d.result].filter(Boolean).join(' �
   </div>}
   <div class="body">
     {compact && <span class="kind inline">{KIND_LABEL[kind]}</span>}
-    <div class="period">{d.ongoing ? <>{fmtMonth(d.start)} – <span class="live">진행 중</span></> : period(d)}</div>
+    {!d.hide_dates && <div class="period">{d.ongoing ? <>{fmtMonth(d.start)} – <span class="live">진행 중</span></> : period(d)}</div>}
     <h3>{d.title}</h3>
     {meta && <p class="meta">{meta}</p>}
     {d.summary && <p class="summary">{d.summary}</p>}
