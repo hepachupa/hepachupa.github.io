@@ -1,6 +1,6 @@
 ---
 title: GAME AiCON BEST VISUAL
-summary: ""
+summary: "KILLA로 GAME AiCON BEST VISUAL 수상"
 start: 2025-08-01
 organizer: "GAME AiCON"
 result: "BEST VISUAL"
