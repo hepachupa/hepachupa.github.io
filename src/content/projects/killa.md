@@ -1,14 +1,14 @@
 ---
 title: KILLA
-summary: 한국형 미스터리 비주얼노벨 어드벤처. 메인 클라이언트 개발자로 게임 시스템 전반을 만들고, TOEI 퍼블리싱 계약부터
-  최적화·배포·QA까지 출시 과정을 이끌었습니다. 국내외 수상·선정 13건.
+summary: 한국형 미스터리 비주얼노벨 어드벤처. 팀의 유일한 프로그래머로 게임의 모든 코드를 작성하고, TOEI 퍼블리싱 계약 이후 최적화·배포·QA까지 출시 과정을 맡았습니다. 국내외 수상·선정 13건.
 start: 2023-03-01
 end: 2026-10-20
 ongoing: true
 featured: true
 hidden: false
-role: 메인 클라이언트 개발 (프로그래밍 리드)
-team: 검귤단 (Black Tangerine)
+role: 단독 프로그래머 — 게임 전체 코드 작성
+team: 검귤단 (Black Tangerine) — 프로그래머 1인
+contribution: 프로그래밍 100%
 tags:
   - Unity 6
   - C#
@@ -23,6 +23,7 @@ tags:
 thumbnail: /images/killa-title.png
 video: https://www.youtube.com/watch?v=tFxTB1mJmiE
 highlights:
+  - 팀 내 유일한 프로그래머 — 시스템 설계부터 툴, 빌드, 출시 대응까지 게임의 모든 코드를 직접 작성
   - 2026년 3월 TOEI와 퍼블리싱 계약 체결 — 인디 프로젝트를 상용 출시 단계까지 끌어올림
   - Steam 데모 공개, 한국어·영어·일본어·중국어 간체/번체 5개 언어 지원
   - GIGDC 일반부문 대상 · SQOOL Award 대상 · 반다이남코 GYAAR Studio 콘테스트 2등 등 수상·선정 13건
