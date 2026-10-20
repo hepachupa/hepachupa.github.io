@@ -5,7 +5,7 @@ start: 2023-03-01
 end: 2023-12-01
 featured: true
 tags: [Unity, C#, LLM, OpenAI API, Generative Agents, Django, 팀 프로젝트]
-thumbnail: ""
+thumbnail: /images/agent-i.webp
 role: 클라이언트 개발 · 클라이언트-서버 연동
 team: 스윗팡이크루
 contribution: ""

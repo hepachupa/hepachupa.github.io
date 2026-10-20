@@ -6,7 +6,7 @@ end: 2023-08-31
 featured: false
 hidden: false
 tags: [Unity, C#, 모바일, 탄막 슈팅, UI, 연출, 팀 프로젝트]
-thumbnail: ""
+thumbnail: /images/magical-girl.png
 role: 클라이언트 개발 — 게임 내 연출 및 UI
 team: 마세구(MSG) 7인 — 프로그래머 2 · 기획 2 · 아트 2 · 사운드 1
 contribution: ""

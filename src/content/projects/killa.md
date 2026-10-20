@@ -6,7 +6,7 @@ end:
 ongoing: true
 featured: true
 tags: [Unity 6, C#, URP, Cinemachine, Spine, FMOD, Dialogue System, Steamworks, AI 활용, 팀 프로젝트]
-thumbnail: ""
+thumbnail: /images/killa.webp
 role: 메인 클라이언트 개발 (프로그래밍 리드)
 team: 검귤단 (Black Tangerine)
 contribution: ""

@@ -4,7 +4,7 @@ summary: 발달장애 아동의 일상 기능 학습을 돕는 교육용 게임.
 start: 2024-03-01
 end: 2024-06-30
 tags: [Unity, C#, 기능성 게임]
-thumbnail: ""
+thumbnail: /images/luru-chichi.webp
 role: ""
 team: ""
 highlights: []
