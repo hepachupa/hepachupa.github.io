@@ -1,0 +1,285 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../layouts/Base.astro';
+import Card from '../components/Card.astro';
+import Detail from '../components/Detail.astro';
+import Video from '../components/Video.astro';
+import profile from '../data/profile.json';
+import { KIND_LABEL, asset, fmtMonth, period, type Kind } from '../lib/util';
+
+const load = async (name: 'projects' | 'awards' | 'activities', kind: Kind) =>
+  (await getCollection(name)).filter((e) => !e.data.hidden).map((e) => ({
+    ...e, kind, uid: `${kind}-${e.id}`,
+    year: (e.data.ongoing ? new Date() : e.data.end ?? e.data.start).getFullYear(),
+    sortKey: e.data.ongoing ? Number.MAX_SAFE_INTEGER : +(e.data.end ?? e.data.start),
+  }));
+
+const projects = await load('projects', 'project');
+const awards = await load('awards', 'award');
+const activities = await load('activities', 'activity');
+const all = [...projects, ...awards, ...activities].sort((a, b) => b.sortKey - a.sortKey || +b.data.start - +a.data.start);
+const featured = projects.filter((p) => p.data.featured).sort((a, b) => b.sortKey - a.sortKey);
+
+const tagCount = new Map<string, number>();
+all.forEach((i) => i.data.tags.forEach((t: string) => tagCount.set(t, (tagCount.get(t) ?? 0) + 1)));
+const tags = [...tagCount.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ko'));
+
+const counts = { project: projects.length, award: awards.length, activity: activities.length };
+const ref = (i: (typeof all)[number]) => ({ uid: i.uid, title: i.data.title, kind: i.kind, when: i.data.hide_dates ? '' : period(i.data), result: i.data.result });
+const relatedOf = (i: (typeof all)[number]) => {
+  if (i.kind === 'project' || !i.data.related) return undefined;
+  const p = projects.find((p) => p.id === i.data.related);
+  return p && ref(p);
+};
+const backrefsOf = (i: (typeof all)[number]) =>
+  i.kind !== 'project' ? [] : all.filter((x) => x.kind !== 'project' && x.data.related === i.id).map(ref);
+
+// 연도 구분선이 들어간 목록
+const rows: ({ year: number } | { item: (typeof all)[number] })[] = [];
+let lastYear: number | undefined;
+for (const item of all) {
+  if (item.year !== lastYear) { rows.push({ year: item.year }); lastYear = item.year; }
+  rows.push({ item });
+}
+
+const now = new Date();
+const updated = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
+---
+<Base>
+  <header class="topbar">
+    <a class="brand" href="#top">{profile.name}{profile.name_en && <span class="brand-en">{profile.name_en}</span>}</a>
+    <nav>
+      <a href="#work">기록</a>
+      <a href="#contact">연락처</a>
+      <button type="button" class="icon-btn" id="print-btn" title="PDF로 저장 (인쇄)">PDF</button>
+      <button type="button" class="icon-btn" id="theme-btn" aria-label="테마 전환">
+        <span class="sun">☀</span><span class="moon">☾</span>
+      </button>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class:list={['hero', { 'has-media': !!profile.hero_video }]}>
+      <div class="hero-text">
+        <p class="hero-name">{profile.name}{profile.name_en && <span>{profile.name_en}</span>}</p>
+        <p class="eyebrow">{profile.role}</p>
+        <h1>{profile.headline}</h1>
+        <p class="intro">{profile.intro}</p>
+        <div class="hero-links">
+          {profile.email && <a class="btn primary" href={`mailto:${profile.email}`}>이메일</a>}
+          {profile.github && <a class="btn" href={profile.github} target="_blank" rel="noopener">GitHub ↗</a>}
+          {profile.blog && <a class="btn" href={profile.blog} target="_blank" rel="noopener">블로그 ↗</a>}
+          {profile.resume && <a class="btn" href={asset(profile.resume)} target="_blank" rel="noopener">이력서 ↗</a>}
+        </div>
+        <ul class="stats">
+          {(Object.keys(counts) as Kind[]).map((k) => (
+            <li><button type="button" data-jump={k}><strong>{counts[k]}</strong><span>{KIND_LABEL[k]}</span></button></li>
+          ))}
+        </ul>
+      </div>
+      {profile.hero_video && <Video url={profile.hero_video} class="hero-media" autoplayFile />}
+    </section>
+
+    {profile.skills?.length > 0 && (
+      <section class="skills" aria-label="기술 스택">
+        <ul>{profile.skills.map((s) => <li>{s}</li>)}</ul>
+      </section>
+    )}
+
+    {featured.length > 0 && (
+      <section class="block">
+        <h2 class="section-title">대표 프로젝트</h2>
+        <div class="featured">{featured.map((p) => <Card item={p} large />)}</div>
+      </section>
+    )}
+
+    <section class="block" id="work">
+      <div class="work-head">
+        <h2 class="section-title">전체 기록</h2>
+        <div class="view-toggle" role="group" aria-label="보기 방식">
+          <button type="button" data-view="grid" aria-pressed="true">카드</button>
+          <button type="button" data-view="timeline" aria-pressed="false">타임라인</button>
+        </div>
+      </div>
+
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" data-kind="all" aria-selected="true">전체 <span>{all.length}</span></button>
+        {(Object.keys(counts) as Kind[]).map((k) => (
+          <button type="button" role="tab" data-kind={k} aria-selected="false">{KIND_LABEL[k]} <span>{counts[k]}</span></button>
+        ))}
+      </div>
+
+      {tags.length > 0 && (
+        <div class="tag-filter">
+          {tags.map(([t, n], i) => <button type="button" data-tag={t} aria-pressed="false" class:list={{ extra: i >= 10 }}>{t}<span>{n}</span></button>)}
+          {tags.length > 10 && <button type="button" class="more-tags" aria-expanded="false">+{tags.length - 10}</button>}
+        </div>
+      )}
+
+      <p class="result-count" aria-live="polite"><span id="count">{all.length}</span>개 항목</p>
+
+      <div class="list grid" id="list">
+        {rows.map((r) => ('year' in r
+          ? <div class="year-mark" data-year-mark={r.year}><span>{r.year}</span></div>
+          : <Card item={r.item} />))}
+      </div>
+      <p class="empty" hidden>조건에 맞는 항목이 없습니다.</p>
+    </section>
+
+    <section class="block contact" id="contact">
+      <h2 class="section-title">연락처</h2>
+      <p>함께 일할 기회를 기다립니다.</p>
+      <div class="hero-links">
+        {profile.email && <a class="btn primary" href={`mailto:${profile.email}`}>{profile.email}</a>}
+        {profile.github && <a class="btn" href={profile.github} target="_blank" rel="noopener">GitHub ↗</a>}
+      </div>
+    </section>
+
+    <!-- 상세 내용: 화면에선 모달로, 인쇄(PDF)에선 전부 펼쳐서 출력 -->
+    <section class="all-details">
+      <h2 class="section-title">상세</h2>
+      {all.map((i) => <Detail item={i} related={relatedOf(i)} backrefs={backrefsOf(i)} />)}
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <span>© {now.getFullYear()} {profile.name}{profile.name_en && ` (${profile.name_en})`}</span>
+    <span>마지막 업데이트 {updated}</span>
+  </footer>
+
+  <dialog id="modal" aria-label="상세 보기">
+    <div class="modal-bar">
+      <button type="button" class="icon-btn" id="copy-link" title="이 항목으로 바로 열리는 링크 복사">링크 복사</button>
+      <button type="button" class="icon-btn" id="modal-close" aria-label="닫기">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body" tabindex="-1" autofocus></div>
+  </dialog>
+
+  <script>
+    const $ = <T extends Element = HTMLElement>(s: string, r: ParentNode = document) => r.querySelector(s) as T | null;
+    const $$ = <T extends Element = HTMLElement>(s: string, r: ParentNode = document) => [...r.querySelectorAll(s)] as T[];
+    const store = {
+      get: (k: string) => { try { return localStorage.getItem(k); } catch { return null; } },
+      set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch {} },
+    };
+
+    // ── 테마 / 인쇄 ──
+    $('#theme-btn')?.addEventListener('click', () => {
+      const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+      document.documentElement.dataset.theme = next;
+      store.set('theme', next);
+    });
+    $('#print-btn')?.addEventListener('click', () => window.print());
+
+    // ── 필터 ──
+    let kind = 'all';
+    let tag: string | null = null;
+    const list = $('#list')!;
+    const cards = $$<HTMLElement>('.card', list);
+    const marks = $$<HTMLElement>('.year-mark', list);
+
+    function apply() {
+      let n = 0;
+      cards.forEach((c) => {
+        const ok = (kind === 'all' || c.dataset.kind === kind) && (!tag || c.dataset.tags!.split('|').includes(tag));
+        c.hidden = !ok;
+        if (ok) n++;
+      });
+      marks.forEach((m) => {
+        const y = m.dataset.yearMark;
+        m.hidden = !cards.some((c) => !c.hidden && c.dataset.year === y);
+      });
+      $('#count')!.textContent = String(n);
+      $('.empty')!.hidden = n > 0;
+    }
+
+    $$<HTMLButtonElement>('.tabs [data-kind]').forEach((b) => b.addEventListener('click', () => {
+      kind = b.dataset.kind!;
+      $$('.tabs [data-kind]').forEach((x) => x.setAttribute('aria-selected', String(x === b)));
+      apply();
+    }));
+    $$<HTMLButtonElement>('[data-tag]').forEach((b) => b.addEventListener('click', () => {
+      tag = tag === b.dataset.tag ? null : b.dataset.tag!;
+      $$<HTMLElement>('[data-tag]').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.tag === tag)));
+      apply();
+    }));
+    $$<HTMLButtonElement>('[data-jump]').forEach((b) => b.addEventListener('click', () => {
+      $<HTMLButtonElement>(`.tabs [data-kind="${b.dataset.jump}"]`)?.click();
+      $('#work')!.scrollIntoView({ behavior: 'smooth' });
+    }));
+
+    $('.more-tags')?.addEventListener('click', (e) => {
+      const b = e.currentTarget as HTMLButtonElement;
+      const open = $('.tag-filter')!.classList.toggle('show-all');
+      b.setAttribute('aria-expanded', String(open));
+      b.textContent = open ? '접기' : `+${$$('.tag-filter .extra').length}`;
+    });
+
+    // ── 보기 전환 ──
+    const setView = (v: string) => {
+      list.classList.toggle('grid', v === 'grid');
+      list.classList.toggle('timeline', v === 'timeline');
+      $$<HTMLElement>('[data-view]').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.view === v)));
+      store.set('view', v);
+    };
+    $$<HTMLButtonElement>('[data-view]').forEach((b) => b.addEventListener('click', () => setView(b.dataset.view!)));
+    if (store.get('view') === 'timeline') setView('timeline');
+
+    // ── 유튜브 지연 로드 (클릭 전엔 썸네일만) ──
+    function bindVideos(root: ParentNode) {
+      $$<HTMLElement>('[data-embed] .yt-play', root).forEach((btn) => btn.addEventListener('click', () => {
+        const f = document.createElement('iframe');
+        f.src = btn.parentElement!.dataset.embed!;
+        f.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
+        f.allowFullscreen = true;
+        f.title = '영상';
+        btn.replaceWith(f);
+      }, { once: true }));
+    }
+    bindVideos($('.hero') ?? document);
+
+    // ── 모달 + 딥링크 (#item/<id>) ──
+    const modal = $<HTMLDialogElement>('#modal')!;
+    const body = $('#modal-body')!;
+    let current: string | null = null;
+
+    function open(uid: string) {
+      const src = document.getElementById(`detail-${uid}`);
+      if (!src) return;
+      current = uid;
+      const clone = src.cloneNode(true) as HTMLElement;
+      clone.removeAttribute('id');
+      body.replaceChildren(clone);
+      bindVideos(body);
+      $$<HTMLElement>('[data-open]', body).forEach((a) => a.addEventListener('click', (e) => {
+        e.preventDefault(); open(a.dataset.open!);
+      }));
+      if (!modal.open) modal.showModal();
+      body.scrollTop = 0;
+      history.replaceState(null, '', `#item/${uid}`);
+    }
+    modal.addEventListener('close', () => {
+      body.replaceChildren(); // 재생 중인 영상 정지
+      current = null;
+      if (location.hash.startsWith('#item/')) history.replaceState(null, '', location.pathname + location.search);
+    });
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.close(); });
+    $('#modal-close')?.addEventListener('click', () => modal.close());
+    $$<HTMLElement>('main [data-open]').forEach((c) => c.addEventListener('click', () => open(c.dataset.open!)));
+
+    $('#copy-link')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget as HTMLButtonElement;
+      const url = `${location.origin}${location.pathname}#item/${current}`;
+      try { await navigator.clipboard.writeText(url); btn.textContent = '복사됨 ✓'; }
+      catch { btn.textContent = '복사 실패'; }
+      setTimeout(() => (btn.textContent = '링크 복사'), 1500);
+    });
+
+    const fromHash = () => {
+      const m = location.hash.match(/^#item\/(.+)$/);
+      if (m) open(decodeURIComponent(m[1]));
+    };
+    window.addEventListener('hashchange', fromHash);
+    fromHash();
+  </script>
+</Base>

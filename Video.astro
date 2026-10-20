@@ -1,0 +1,18 @@
+---
+import { videoSource } from '../lib/util';
+interface Props { url?: string; class?: string; autoplayFile?: boolean }
+const { url, class: cls, autoplayFile = false } = Astro.props;
+const v = videoSource(url);
+---
+{v?.kind === 'embed' ? (
+  <div class:list={['video', cls]} data-embed={v.embed}>
+    <button type="button" class="yt-play" aria-label="영상 재생">
+      <img src={v.thumb} alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'" />
+      <span class="play">▶</span>
+    </button>
+  </div>
+) : v?.kind === 'file' ? (
+  autoplayFile
+    ? <video class:list={['video-file', cls]} src={v.src} autoplay muted loop playsinline preload="metadata"></video>
+    : <video class:list={['video-file', cls]} src={v.src} controls preload="none" playsinline></video>
+) : null}
