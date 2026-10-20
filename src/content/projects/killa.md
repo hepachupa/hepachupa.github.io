@@ -343,5 +343,6 @@ private void OnLine(Subtitle subtitle)
 - BIC 2023 · 2026 (부산인디커넥트 페스티벌)
 - 버닝비버 2023 · 2024 — 2년 연속 '올해의 버닝비버'
 - 플레이엑스포 2024 Indie Arcade
+- **Unite Seoul 2026** [Legendary & Indie Showcase](https://unitysquare.co.kr/event/communityevent/view?id=120#indie-game) (Unity 주최, 코엑스)
 
 외 일러스타 페스, 서울팝콘, GXG, GLS, UGDAP, 도쿄 게임 던전, GAME AiCON 등
