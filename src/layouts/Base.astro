@@ -16,7 +16,6 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://example.com
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
-    <link rel="icon" href={asset('/favicon.svg')} type="image/svg+xml" />
 
     <!-- 링크 미리보기 (카카오톡·슬랙·디스코드) -->
     <meta property="og:type" content="website" />

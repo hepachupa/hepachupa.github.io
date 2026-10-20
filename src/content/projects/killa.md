@@ -20,7 +20,7 @@ tags:
   - Steamworks
   - AI 활용
   - 팀 프로젝트
-thumbnail: /images/스크린샷 2026-10-20 184231.png
+thumbnail: /images/killa-title.png
 video: https://www.youtube.com/watch?v=tFxTB1mJmiE
 highlights:
   - 2026년 3월 TOEI와 퍼블리싱 계약 체결 — 인디 프로젝트를 상용 출시 단계까지 끌어올림
