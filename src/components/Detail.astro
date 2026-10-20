@@ -1,0 +1,97 @@
+---
+import { render } from 'astro:content';
+import { KIND_LABEL, period, asset, youtubeId, type Kind } from '../lib/util';
+interface Ref { uid: string; title: string; kind: Kind; when: string; result?: string }
+interface Props { item: any; related?: Ref; backrefs?: Ref[] }
+const { item, related, backrefs = [] } = Astro.props;
+const d = item.data;
+const kind: Kind = item.kind;
+const { Content } = await render(item);
+const yt = youtubeId(d.video);
+const facts: [string, string | undefined][] = [
+  ['기간', period(d)],
+  ['역할', d.role],
+  ['팀', d.team],
+  ['기여', d.contribution],
+  ['주최', d.organizer],
+  ['결과', d.result],
+  ['소속', d.organization],
+];
+---
+<article class="detail" id={`detail-${item.uid}`} data-uid={item.uid}>
+  <header>
+    <span class:list={['kind-pill', `k-${kind}`]}>{KIND_LABEL[kind]}</span>
+    <h2>{d.title}</h2>
+    {d.summary && <p class="lead">{d.summary}</p>}
+  </header>
+
+  {yt ? (
+    <div class="video" data-yt={yt}>
+      <button type="button" class="yt-play" aria-label="영상 재생">
+        <img src={`https://i.ytimg.com/vi/${yt}/hqdefault.jpg`} alt="" loading="lazy" />
+        <span class="play">▶</span>
+      </button>
+    </div>
+  ) : d.video ? (
+    <video class="video-file" src={asset(d.video)} controls preload="none" playsinline></video>
+  ) : d.thumbnail ? (
+    <img class="cover" src={asset(d.thumbnail)} alt="" loading="lazy" />
+  ) : null}
+
+  <dl class="facts">
+    {facts.filter(([, v]) => v).map(([k, v]) => (<div><dt>{k}</dt><dd>{v}</dd></div>))}
+  </dl>
+
+  {d.highlights.length > 0 && (
+    <section class="highlights">
+      <h4>핵심 성과</h4>
+      <ul>{d.highlights.map((h: string) => <li>{h}</li>)}</ul>
+    </section>
+  )}
+
+  <div class="prose"><Content /></div>
+
+  {d.gallery.length > 0 && (
+    <div class="gallery">{d.gallery.map((g: string) => (
+      <a href={asset(g)} target="_blank" rel="noopener"><img src={asset(g)} alt="" loading="lazy" /></a>
+    ))}</div>
+  )}
+
+  {d.certificate && (
+    <figure class="cert">
+      <a href={asset(d.certificate)} target="_blank" rel="noopener"><img src={asset(d.certificate)} alt="수상 증빙" loading="lazy" /></a>
+      <figcaption>증빙 자료</figcaption>
+    </figure>
+  )}
+
+  {related && (
+    <p class="related">관련 프로젝트: <a href={`#item/${related.uid}`} data-open={related.uid}>{related.title} →</a></p>
+  )}
+
+  {backrefs.length > 0 && (
+    <section class="backrefs">
+      <h4>이 프로젝트로 받은 수상 · 함께한 활동 <span>{backrefs.length}</span></h4>
+      <ul>
+        {backrefs.map((r) => (
+          <li>
+            <a href={`#item/${r.uid}`} data-open={r.uid}>
+              <span class:list={['dot', `k-${r.kind}`]}></span>
+              <span class="when">{r.when}</span>
+              <span class="t">{r.title}</span>
+              {r.result && <span class="r">{r.result}</span>}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
+
+  {(d.tags.length > 0 || d.links.length > 0) && (
+    <footer>
+      {d.tags.length > 0 && <ul class="tags">{d.tags.map((t: string) => <li>{t}</li>)}</ul>}
+      {d.links.length > 0 && (
+        <div class="links">{d.links.map((l: any) => <a class="btn" href={l.url} target="_blank" rel="noopener">{l.label} ↗</a>)}</div>
+      )}
+    </footer>
+  )}
+</article>

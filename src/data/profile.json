@@ -1,0 +1,27 @@
+{
+  "name": "장재원",
+  "role": "Unity 게임 클라이언트 개발자",
+  "headline": "TOEI 퍼블리싱 · 수상 13건, KILLA를 출시까지 끌고 가는 클라이언트 개발자",
+  "intro": "인디 팀 검귤단에서 미스터리 비주얼노벨 어드벤처 KILLA의 메인 클라이언트 개발을 맡고 있습니다. 게임 시스템 설계부터 TOEI 퍼블리싱 이후의 최적화·배포·QA까지 출시 과정 전체를 경험했고, 그 과정에서 AI 에이전트를 Unity 에디터에 연결해 개발 도구로 활용해 왔습니다.",
+  "email": "hepachupa@gmail.com",
+  "github": "https://github.com/hepachupa",
+  "blog": "",
+  "resume": "",
+  "hero_video": "",
+  "skills": [
+    "Unity 6 / URP",
+    "C#",
+    "Cinemachine",
+    "Spine",
+    "FMOD",
+    "PixelCrushers Dialogue System",
+    "Steamworks",
+    "Git",
+    "Unity MCP · AI 에이전트 활용",
+    "LLM API 연동"
+  ],
+  "seo_description": "장재원 (Jaewon Chang) — Unity 클라이언트 개발자. KILLA (TOEI 퍼블리싱, GIGDC 대상·SQOOL Award 대상 외 수상·선정 13건), LLM 생성형 에이전트 게임 Agent.I",
+  "og_image": "/og.png",
+  "umami_website_id": "",
+  "name_en": "Jaewon Chang"
+}
