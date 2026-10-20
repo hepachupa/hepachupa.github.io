@@ -47,6 +47,10 @@ links:
     url: https://store.steampowered.com/publisher/toeigames
   - label: GitHub
     url: https://github.com/hepachupa
+  - label: "기사: TGS 2026 토에이 게임즈 부스 출전 (인벤)"
+    url: https://www.inven.co.kr/webzine/news/?news=321276
+  - label: "기사: BIC 2026 토에이 게임즈 부스 출전 (인벤)"
+    url: https://www.inven.co.kr/webzine/news/?news=319595
 ---
 ## 기술 스택
 
