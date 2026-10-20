@@ -171,6 +171,8 @@ const updated = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
       store.set('theme', next);
     });
     $('#print-btn')?.addEventListener('click', () => window.print());
+    // 인쇄(PDF) 시 접힌 코드도 모두 펼침
+    window.addEventListener('beforeprint', () => document.querySelectorAll('details.code-fold').forEach((d) => (d.open = true)));
 
     // ── 필터 ──
     let kind = 'all';

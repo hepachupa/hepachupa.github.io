@@ -329,3 +329,12 @@ dialog::backdrop { background: rgb(0 0 0 / .6); backdrop-filter: blur(3px); }
   .btn.primary { background: none; color: var(--accent); }
   .links a::after { content: ' (' attr(href) ')'; font-weight: 400; font-size: 11px; color: #555; }
 }
+
+/* 접는 코드 블록 */
+.code-fold { margin: 8px 0 16px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.code-fold > summary { cursor: pointer; padding: 10px 14px; font-size: 14px; font-weight: 600; color: var(--accent); list-style: none; user-select: none; }
+.code-fold > summary::-webkit-details-marker { display: none; }
+.code-fold > summary::before { content: "▸"; display: inline-block; margin-right: 8px; transition: transform .15s; }
+.code-fold[open] > summary::before { transform: rotate(90deg); }
+.code-fold > summary:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.code-fold pre { margin: 0 !important; border-radius: 0 !important; }

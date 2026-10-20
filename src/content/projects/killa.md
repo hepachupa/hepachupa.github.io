@@ -56,6 +56,8 @@ Unity 6 (URP) · C# · PixelCrushers Dialogue System / Save System (Lua 변수) 
 
 교내 지원사업과 공모전으로 시작한 KILLA는 국내외 수상·선정 13건으로 완성도를 검증받았고, 2026년 3월 **TOEI와 퍼블리싱 계약**을 맺었습니다. 퍼블리셔와 일하면서 "재미있는 데모"가 아니라 **일정 안에 안정적으로 출시되는 빌드**를 만드는 것이 클라이언트 개발자의 일이 되었습니다. 아래는 그 과정에서 맡은 일이며, 30회 이상의 전시 이력은 페이지 맨 아래에 정리했습니다.
 
+*각 항목의 코드는 접어 두었습니다. 퍼블리싱 중인 상용 프로젝트라 구조가 드러나는 부분만 발췌했으며, 스포일러가 될 수 있는 변수명과 씬 이름, 인스펙터 툴팁과 일부 필드·예외 처리는 제외하고 축약했습니다.*
+
 ## 1. 회차 플레이 구조 전면 개편 (8개월)
 
 **문제** — 기획 의도는 엔딩 후 처음부터 다시 플레이하는 회차 구조였지만, Claude로 프로젝트 전체의 상태 흐름을 조사한 결과 실제 구현은 한 번 지나간 장면에 다시 오지 않는다는 전제의 단방향 구조였습니다. 진행 상태가 30개 이상의 씬과 오브젝트에 분산되어 있어, 같은 장면을 다시 지나가면 상태가 어긋났습니다.
@@ -69,112 +71,14 @@ Unity 6 (URP) · C# · PixelCrushers Dialogue System / Save System (Lua 변수) 
 
 **결과** — 2022년부터 개발해 온 프로젝트를 8개월 만에 회차 플레이 구조로 전면 개편했습니다.
 
-## 2. AI를 개발 도구로 활용
-
-**방식** — Unity MCP로 Claude를 Unity 에디터에 직접 연결해, 씬·컴포넌트 조회, 스크립트 작성과 리팩터링, 감사용 에디터 툴 제작에 활용했습니다. 아래 4번의 최적화 감사, 6번의 전역 매니저 점검과 QA 툴 대부분이 이 방식으로 만들어졌습니다.
-
-**검증** — AI 결과물을 그대로 믿지 않았습니다. 도구를 사용하며 발견한 한계(중복 메서드 오탐, 코드 실행 기능 미동작, 파일 해시 불일치 시 편집 실패)를 문서로 정리하고, 어떤 작업을 AI에 맡기고 어떤 작업은 직접 확인할지 기준을 세워 팀 워크플로로 만들었습니다. Claude가 제안한 수정도 기존 구조와 맞는지 먼저 검토하고, 프로젝트의 다른 시스템과 같은 패턴을 따르도록 직접 조정했습니다.
-
-**결과** — 반복적인 감사·리팩터링 작업은 AI에 맡기고, 구조 설계와 최종 검증에 시간을 집중할 수 있었습니다.
-
-## 3. 시점 구조와 연출
-
-- 콘텐츠에 따라 **3D 사이드뷰, 2D 화면, 3인칭 쿼터뷰**를 오가는 시점 구조를 구현해 한 가지 시점의 단조로움을 해소
-- Spine 애니메이션과 Cinemachine 카메라 연출로 스테이지를 구성하고, 플레이어가 NPC와 직접 상호작용한다고 느끼도록 콘텐츠별 연출 설계
-- 전시에서 반응이 밋밋한 구간을 찾아 애니메이션과 셰이더를 추가해 긴장감과 깊이감을 보강 — 이후 전시에서 "화면이 풍부해졌다"는 평가
-
-<img src="/images/killa-symbol-fx.webp" alt="KILLA 기호 조합 장면 연출" loading="lazy" decoding="async" />
-
-*기호 조합 장면 — Spine 애니메이션과 셰이더·포스트 프로세싱 연출*
-
-<img src="/images/killa-stage-fx.webp" alt="KILLA 추리 장면 연출" loading="lazy" decoding="async" />
-
-*추리 장면 — Spine 애니메이션과 셰이더·포스트 프로세싱 연출*
-
-<img src="/images/killa-evidence-ui-v2.webp" alt="KILLA 증거 선택 UI 연출" loading="lazy" decoding="async" />
-
-*증거 선택 UI — 필름 스트립 위로 증거를 배치하는 연출*
-
-*(Unity 에디터 캡처)*
-
-## 4. 최적화
-
-**문제** — 장소(LOC) 씬이 늘어나면서 씬마다 불필요한 컴포넌트, 중복 라이트·볼륨, 미사용 오브젝트가 쌓였고, 수작업으로 확인하기에는 씬 수가 많았습니다.
-
-**해결** — 씬을 자동으로 검사해 문제 항목을 리포트하는 에디터 툴 `SceneOptimAudit`을 만들고, 여러 LOC 씬에 일괄 최적화 패스를 진행했습니다. 구버전 Post Processing Stack v2 설정은 URP Volume Profile로 이관했습니다.
-
-**결과** — 최적화 대상을 사람의 감이 아니라 리포트 기준으로 관리하게 되었습니다.
-
-## 5. 배포 · 빌드 파이프라인
-
-**문제** — 전시용, QA용, 출시용 빌드마다 시작 지점과 설정이 달라 매번 수동으로 변경해야 했고, 작은 실수가 빌드 사고로 이어졌습니다.
-
-**해결** — `BuildConfig`로 Normal / GameShow / QA 세 가지 빌드 모드를 분리하고, `StartPoint`(씬 + 스토리 레이어 + 스폰 위치 + 날짜 + 초기 Lua)로 어느 지점에서든 시작할 수 있게 했습니다. 전시 빌드에는 무인 운영(`AttractController`, `ExpoIdleWatcher`)과 요약 씬을, 출시 빌드에는 Steamworks 연동을 넣었습니다.
-
-**결과** — 빌드 종류를 설정만으로 전환할 수 있게 되어 BIC 등 전시와 QA 빌드를 코드 수정 없이 내보냈습니다.
-
-## 6. QA · 안정화
-
-**문제** — 분기 서사 게임이라 특정 지점을 재현하려면 앞부분 대사를 모두 진행해야 했고, 전역 매니저가 늘면서 중복 생성·초기화 순서 문제가 간헐적으로 발생했습니다.
-
-**해결**
-
-- `DEBUG_QA` 심볼로 묶은 QA 전용 대사 스킵(`QADialogueSkipper`)과 QA 빌드 모드로 재현 시간을 단축
-- 전역 매니저 14종을 전수 감사 — DontDestroyOnLoad 중복 가드, 실행 순서 정리, Lua 변수명 `GLOBAL.XXX` 규칙으로 통일
-- `GlobalVarAuditor`로 대화 데이터베이스의 변수 오탈자·미사용 변수를 자동 검출
-- 세이브/로드 전면 개편: 슬롯 불일치, 씬 전환 중 저장 타이밍, NPC 위치 복원, 대화 중복 재생 문제 해결
-- 프로젝트 손상(URP 렌더러, 스크립팅 심볼, 자막 프리팹) 발생 시 Git 이력으로 복구
-
-**결과** — QA가 "처음부터 다시 플레이"가 아니라 "원하는 지점에서 바로 확인"하는 방식으로 바뀌었습니다.
-
-## 7. 협업 툴: 대사별 FMOD 효과음 자동 재생
-
-**문제** — 대사에 맞춰 효과음을 넣으려면 씬에 이벤트를 따로 배치하거나, 대사 노드마다 이벤트를 일일이 입력해야 했습니다. 효과음을 추가하거나 교체할 때마다 씬 수정과 반복 입력 작업이 필요했습니다.
-
-**해결** — 대화 데이터베이스의 각 대사 항목에 FMOD 이벤트를 지정해 두면, 그 대사가 시작될 때 자동으로 재생하는 런타임 플레이어 `DialogueFmodLocalPlayer`를 만들었습니다.
-
-- `RuntimeInitializeOnLoadMethod`로 게임 시작 시 스스로 설치 — 씬과 프리팹을 하나도 수정하지 않음
-- 이벤트를 경로가 아닌 GUID로 조회해, FMOD에서 이벤트 이름이나 폴더를 변경해도 연결이 유지됨
-- 2D 원샷 이벤트만 재생하고 다른 이벤트·버스는 제어하지 않아 BGM과 기존 씬 이벤트에 영향 없음
-- 같은 대사가 여러 경로로 중복 통지되어도 한 번만 재생하고, 잘못된 GUID나 로드되지 않은 뱅크는 대화·항목 ID와 함께 경고로 출력
-
-**결과** — 효과음 추가·교체가 대화 데이터 수정만으로 끝나, 사운드 작업이 코드나 씬 수정 없이 게임에 즉시 반영됩니다.
-
-```csharp
-// 대사가 준비되는 시점에 해당 항목의 FMOD 이벤트를 재생 (발췌)
-private void OnLine(Subtitle subtitle)
-{
-    var entry = subtitle?.dialogueEntry;
-    if (entry?.fields == null || entry.isRoot || entry.isGroup) return;
-    if (string.IsNullOrEmpty(Field.LookupValue(entry.fields, GuidField))) return; // 지정 안 된 대사는 기존 방식 그대로
-
-    // 여러 컨트롤러·캐치업 경로로 같은 대사가 두 번 와도 한 번만 재생
-    if (ReferenceEquals(lastSubtitle, subtitle) && lastFrame == Time.frameCount) return;
-    lastSubtitle = subtitle;
-    lastFrame = Time.frameCount;
-
-    if (!TryReadGuid(entry, out var guid)) { Warn(entry, "Invalid event GUID."); return; }
-
-    var description = RuntimeManager.GetEventDescription(guid); // 경로가 아닌 GUID로 조회
-    description.isOneshot(out var oneShot);
-    description.is3D(out var spatial);
-    if (!oneShot || spatial) { Warn(entry, "Only 2D one-shot events are played."); return; }
-
-    description.createInstance(out var instance);
-    instance.start();
-    instance.release(); // 원샷: 재생이 끝나면 FMOD가 자동 해제
-}
-```
-
-## 핵심 코드 발췌
-
-퍼블리싱 중인 상용 프로젝트라 구조가 드러나는 부분만 일부 발췌했습니다. 스포일러가 될 수 있는 변수명과 씬 이름, 인스펙터 툴팁과 일부 필드·예외 처리는 제외하고 축약했습니다.
-
-### 1. 스토리 단계를 데이터로 관리 — `StoryLayerController`
+**코드: 스토리 단계를 데이터로 관리 — `StoryLayerController`**
 
 씬마다 조건문을 분산하는 대신, 스토리 단계 이름과 **같은 이름의 오브젝트 묶음만 활성화하는** 방식으로 분기를 단순화했습니다. 시나리오가 늘어도 씬에 레이어 오브젝트만 추가하면 되며, 코드는 수정할 필요가 없습니다.
 
 **개선 이력:** 초기 구현은 세이브 복원이 끝났을 것이라 가정하고 **3프레임을 대기한 뒤** 적용했습니다. 복원이 늦어지는 씬에서는 잘못된 레이어가 활성화될 수 있는 구조였습니다. 현재는 세이브 시스템의 **복원 완료 이벤트(`saveDataApplied`)에 맞춰 적용**하고, 세이브를 거치지 않는 로드에만 폴백으로 대기하도록 변경했습니다. 같은 프로젝트의 스폰 처리와 같은 패턴으로 맞췄고, 단계 이름에 맞는 레이어가 없으면 경고를 출력해 데이터 오타를 즉시 발견할 수 있게 했습니다. 직렬화 필드와 공개 메서드는 유지해 기존 씬과 호출부를 수정할 필요가 없습니다.
+
+<details class="code-fold">
+<summary>코드 보기 — StoryLayerController</summary>
 
 ```csharp
 public class StoryLayerController : MonoBehaviour
@@ -222,9 +126,14 @@ public class StoryLayerController : MonoBehaviour
 }
 ```
 
-### 2. 조건부 씬 이동 — `PortalStoryRouter`
+</details>
+
+**코드: 조건부 씬 이동 — `PortalStoryRouter`**
 
 같은 문이라도 스토리 단계, 퀘스트 상태, 변수에 따라 다른 목적지로 이동시켜야 했습니다. **조건이 있는 경로는 배열 순서대로 우선 검사**하고, 하나도 맞지 않으면 **조건 없는 기본 경로**로 이동하도록 설계해, 기획자가 인스펙터에서 경로를 추가하는 것만으로 분기를 만들 수 있게 했습니다.
+
+<details class="code-fold">
+<summary>코드 보기 — PortalStoryRouter</summary>
 
 ```csharp
 public bool TryResolve(out string scene, out string storyStep, out string spawnId)
@@ -266,9 +175,59 @@ private static bool ConditionMet(Route r)
 }
 ```
 
-### 3. 어디서든 시작하는 빌드 — `BuildConfig.StartPoint`
+</details>
+
+
+## 2. AI를 개발 도구로 활용
+
+**방식** — Unity MCP로 Claude를 Unity 에디터에 직접 연결해, 씬·컴포넌트 조회, 스크립트 작성과 리팩터링, 감사용 에디터 툴 제작에 활용했습니다. 아래 4번의 최적화 감사, 6번의 전역 매니저 점검과 QA 툴 대부분이 이 방식으로 만들어졌습니다.
+
+**검증** — AI 결과물을 그대로 믿지 않았습니다. 도구를 사용하며 발견한 한계(중복 메서드 오탐, 코드 실행 기능 미동작, 파일 해시 불일치 시 편집 실패)를 문서로 정리하고, 어떤 작업을 AI에 맡기고 어떤 작업은 직접 확인할지 기준을 세워 팀 워크플로로 만들었습니다. Claude가 제안한 수정도 기존 구조와 맞는지 먼저 검토하고, 프로젝트의 다른 시스템과 같은 패턴을 따르도록 직접 조정했습니다.
+
+**결과** — 반복적인 감사·리팩터링 작업은 AI에 맡기고, 구조 설계와 최종 검증에 시간을 집중할 수 있었습니다.
+
+## 3. 시점 구조와 연출
+
+- 콘텐츠에 따라 **3D 사이드뷰, 2D 화면, 3인칭 쿼터뷰**를 오가는 시점 구조를 구현해 한 가지 시점의 단조로움을 해소
+- Spine 애니메이션과 Cinemachine 카메라 연출로 스테이지를 구성하고, 플레이어가 NPC와 직접 상호작용한다고 느끼도록 콘텐츠별 연출 설계
+- 전시에서 반응이 밋밋한 구간을 찾아 애니메이션과 셰이더를 추가해 긴장감과 깊이감을 보강 — 이후 전시에서 "화면이 풍부해졌다"는 평가
+
+<img src="/images/killa-symbol-fx.webp" alt="KILLA 기호 조합 장면 연출" loading="lazy" decoding="async" />
+
+*기호 조합 장면 — Spine 애니메이션과 셰이더·포스트 프로세싱 연출*
+
+<img src="/images/killa-stage-fx.webp" alt="KILLA 추리 장면 연출" loading="lazy" decoding="async" />
+
+*추리 장면 — Spine 애니메이션과 셰이더·포스트 프로세싱 연출*
+
+<img src="/images/killa-evidence-ui-v2.webp" alt="KILLA 증거 선택 UI 연출" loading="lazy" decoding="async" />
+
+*증거 선택 UI — 필름 스트립 위로 증거를 배치하는 연출*
+
+*(Unity 에디터 캡처)*
+
+## 4. 최적화
+
+**문제** — 장소(LOC) 씬이 늘어나면서 씬마다 불필요한 컴포넌트, 중복 라이트·볼륨, 미사용 오브젝트가 쌓였고, 수작업으로 확인하기에는 씬 수가 많았습니다.
+
+**해결** — 씬을 자동으로 검사해 문제 항목을 리포트하는 에디터 툴 `SceneOptimAudit`을 만들고, 여러 LOC 씬에 일괄 최적화 패스를 진행했습니다. 구버전 Post Processing Stack v2 설정은 URP Volume Profile로 이관했습니다.
+
+**결과** — 최적화 대상을 사람의 감이 아니라 리포트 기준으로 관리하게 되었습니다.
+
+## 5. 배포 · 빌드 파이프라인
+
+**문제** — 전시용, QA용, 출시용 빌드마다 시작 지점과 설정이 달라 매번 수동으로 변경해야 했고, 작은 실수가 빌드 사고로 이어졌습니다.
+
+**해결** — `BuildConfig`로 Normal / GameShow / QA 세 가지 빌드 모드를 분리하고, `StartPoint`(씬 + 스토리 레이어 + 스폰 위치 + 날짜 + 초기 Lua)로 어느 지점에서든 시작할 수 있게 했습니다. 전시 빌드에는 무인 운영(`AttractController`, `ExpoIdleWatcher`)과 요약 씬을, 출시 빌드에는 Steamworks 연동을 넣었습니다.
+
+**결과** — 빌드 종류를 설정만으로 전환할 수 있게 되어 BIC 등 전시와 QA 빌드를 코드 수정 없이 내보냈습니다.
+
+**코드: 어디서든 시작하는 빌드 — `BuildConfig.StartPoint`**
 
 전시·QA 빌드를 코드 수정 없이 만들기 위해, "어디서부터 시작할지"를 **씬 + 스토리 단계 + 스폰 위치 + 날짜 + 초기 Lua**의 데이터 묶음으로 정의했습니다. ScriptableObject 하나로 Normal / GameShow / QA 모드를 전환합니다.
+
+<details class="code-fold">
+<summary>코드 보기 — BuildConfig.StartPoint</summary>
 
 ```csharp
 [CreateAssetMenu(fileName = "BuildConfig", menuName = "Game/Build Config")]
@@ -298,6 +257,67 @@ public class BuildConfig : ScriptableObject
     public StartPoint GameShowStart => gameShowStart;
 }
 ```
+
+</details>
+
+
+## 6. QA · 안정화
+
+**문제** — 분기 서사 게임이라 특정 지점을 재현하려면 앞부분 대사를 모두 진행해야 했고, 전역 매니저가 늘면서 중복 생성·초기화 순서 문제가 간헐적으로 발생했습니다.
+
+**해결**
+
+- `DEBUG_QA` 심볼로 묶은 QA 전용 대사 스킵(`QADialogueSkipper`)과 QA 빌드 모드로 재현 시간을 단축
+- 전역 매니저 14종을 전수 감사 — DontDestroyOnLoad 중복 가드, 실행 순서 정리, Lua 변수명 `GLOBAL.XXX` 규칙으로 통일
+- `GlobalVarAuditor`로 대화 데이터베이스의 변수 오탈자·미사용 변수를 자동 검출
+- 세이브/로드 전면 개편: 슬롯 불일치, 씬 전환 중 저장 타이밍, NPC 위치 복원, 대화 중복 재생 문제 해결
+- 프로젝트 손상(URP 렌더러, 스크립팅 심볼, 자막 프리팹) 발생 시 Git 이력으로 복구
+
+**결과** — QA가 "처음부터 다시 플레이"가 아니라 "원하는 지점에서 바로 확인"하는 방식으로 바뀌었습니다.
+
+## 7. 협업 툴: 대사별 FMOD 효과음 자동 재생
+
+**문제** — 대사에 맞춰 효과음을 넣으려면 씬에 이벤트를 따로 배치하거나, 대사 노드마다 이벤트를 일일이 입력해야 했습니다. 효과음을 추가하거나 교체할 때마다 씬 수정과 반복 입력 작업이 필요했습니다.
+
+**해결** — 대화 데이터베이스의 각 대사 항목에 FMOD 이벤트를 지정해 두면, 그 대사가 시작될 때 자동으로 재생하는 런타임 플레이어 `DialogueFmodLocalPlayer`를 만들었습니다.
+
+- `RuntimeInitializeOnLoadMethod`로 게임 시작 시 스스로 설치 — 씬과 프리팹을 하나도 수정하지 않음
+- 이벤트를 경로가 아닌 GUID로 조회해, FMOD에서 이벤트 이름이나 폴더를 변경해도 연결이 유지됨
+- 2D 원샷 이벤트만 재생하고 다른 이벤트·버스는 제어하지 않아 BGM과 기존 씬 이벤트에 영향 없음
+- 같은 대사가 여러 경로로 중복 통지되어도 한 번만 재생하고, 잘못된 GUID나 로드되지 않은 뱅크는 대화·항목 ID와 함께 경고로 출력
+
+**결과** — 효과음 추가·교체가 대화 데이터 수정만으로 끝나, 사운드 작업이 코드나 씬 수정 없이 게임에 즉시 반영됩니다.
+
+<details class="code-fold">
+<summary>코드 보기 — DialogueFmodLocalPlayer.OnLine</summary>
+
+```csharp
+// 대사가 준비되는 시점에 해당 항목의 FMOD 이벤트를 재생 (발췌)
+private void OnLine(Subtitle subtitle)
+{
+    var entry = subtitle?.dialogueEntry;
+    if (entry?.fields == null || entry.isRoot || entry.isGroup) return;
+    if (string.IsNullOrEmpty(Field.LookupValue(entry.fields, GuidField))) return; // 지정 안 된 대사는 기존 방식 그대로
+
+    // 여러 컨트롤러·캐치업 경로로 같은 대사가 두 번 와도 한 번만 재생
+    if (ReferenceEquals(lastSubtitle, subtitle) && lastFrame == Time.frameCount) return;
+    lastSubtitle = subtitle;
+    lastFrame = Time.frameCount;
+
+    if (!TryReadGuid(entry, out var guid)) { Warn(entry, "Invalid event GUID."); return; }
+
+    var description = RuntimeManager.GetEventDescription(guid); // 경로가 아닌 GUID로 조회
+    description.isOneshot(out var oneShot);
+    description.is3D(out var spatial);
+    if (!oneShot || spatial) { Warn(entry, "Only 2D one-shot events are played."); return; }
+
+    description.createInstance(out var instance);
+    instance.start();
+    instance.release(); // 원샷: 재생이 끝나면 FMOD가 자동 해제
+}
+```
+
+</details>
 
 ## 게임 시스템
 
