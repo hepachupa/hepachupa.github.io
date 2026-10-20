@@ -1,24 +1,35 @@
 ---
 title: KILLA
-summary: 한국형 미스터리 비주얼노벨 어드벤처. 메인 클라이언트 개발자로 게임 시스템 전반을 만들고, TOEI 퍼블리싱 계약부터 최적화·배포·QA까지 출시 과정을 이끌었습니다. 국내외 수상·선정 13건.
+summary: 한국형 미스터리 비주얼노벨 어드벤처. 메인 클라이언트 개발자로 게임 시스템 전반을 만들고, TOEI 퍼블리싱 계약부터
+  최적화·배포·QA까지 출시 과정을 이끌었습니다. 국내외 수상·선정 13건.
 start: 2023-03-01
-end:
+end: 2026-10-20
 ongoing: true
 featured: true
-tags: [Unity 6, C#, URP, Cinemachine, Spine, FMOD, Dialogue System, Steamworks, AI 활용, 팀 프로젝트]
-thumbnail: /images/killa-v3.webp
+hidden: false
 role: 메인 클라이언트 개발 (프로그래밍 리드)
 team: 검귤단 (Black Tangerine)
-contribution: ""
+tags:
+  - Unity 6
+  - C#
+  - URP
+  - Cinemachine
+  - Spine
+  - FMOD
+  - Dialogue System
+  - Steamworks
+  - AI 활용
+  - 팀 프로젝트
+thumbnail: /images/스크린샷 2026-10-20 184231.png
+video: https://www.youtube.com/watch?v=tFxTB1mJmiE
 highlights:
   - 2026년 3월 TOEI와 퍼블리싱 계약 체결 — 인디 프로젝트를 상용 출시 단계까지 끌어올림
   - Steam 데모 공개, 한국어·영어·일본어·중국어 간체/번체 5개 언어 지원
   - GIGDC 일반부문 대상 · SQOOL Award 대상 · 반다이남코 GYAAR Studio Award 2등 등 수상·선정 13건
   - 출시 파이프라인 직접 구축 — 씬 최적화, Normal/GameShow/QA 3종 빌드, Steamworks 연동, QA 전용 빌드·툴
-  - Unity MCP로 AI 에이전트를 에디터에 연결해 최적화 감사·리팩터링·QA 툴 제작에 활용하고, 도구의 한계를 문서화해 팀 워크플로로 정립
+  - Unity MCP로 AI 에이전트를 에디터에 연결해 최적화 감사·리팩터링·QA 툴 제작에 활용하고, 도구의 한계를 문서화해 팀 워크플로로
+    정립
   - Bootstrap 씬 + 전역 매니저 14종 안정화 감사, 세이브/로드 전면 개편
-video: https://www.youtube.com/watch?v=tFxTB1mJmiE
-gallery: []
 links:
   - label: Steam
     url: https://store.steampowered.com/app/2524200/KILLA/
@@ -27,7 +38,6 @@ links:
   - label: GitHub
     url: https://github.com/hepachupa
 ---
-
 ## 기술 스택
 
 Unity 6 (URP) · C# · PixelCrushers Dialogue System / Save System (Lua 변수) · Spine · FMOD · Cinemachine · Steamworks · Unity MCP (AI 에이전트 연동)
@@ -57,6 +67,7 @@ Unity 6 (URP) · C# · PixelCrushers Dialogue System / Save System (Lua 변수) 
 **문제** — 분기 서사 게임이라 특정 지점을 재현하려면 앞부분 대사를 전부 넘겨야 했고, 전역 매니저가 늘면서 중복 생성·초기화 순서 문제가 간헐적으로 터졌습니다.
 
 **해결**
+
 - `DEBUG_QA` 심볼로 묶은 QA 전용 대사 스킵(`QADialogueSkipper`)과 QA 빌드 모드로 재현 시간을 단축
 - 전역 매니저 14종을 전수 감사 — DontDestroyOnLoad 중복 가드, 실행 순서 정리, Lua 변수명 `GLOBAL.XXX` 규칙으로 통일
 - `GlobalVarAuditor`로 대화 데이터베이스의 변수 오탈자·미사용 변수를 자동 검출
@@ -80,3 +91,4 @@ Unity 6 (URP) · C# · PixelCrushers Dialogue System / Save System (Lua 변수) 
 - **게임플레이** — 심문(`InterrogationManager`), 범인 추리 퀴즈, 기호 조합(`SympathyManager`), 카세트 플레이어 미니게임, 천장 걷기 중력 존
 - **게임오버** — 콘텐츠별 목숨을 Lua 변수로 관리, 게임오버마다 자동 저장, 누적 횟수에 따른 히든 엔딩
 - **UI** — 아이템/퀘스트 분리 알림 큐, `QuestCatalog` ScriptableObject, 로컬라이제이션 연동 `ConfirmDialog`, Spine 말하기 애니메이션 홀드
+
