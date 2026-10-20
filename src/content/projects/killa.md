@@ -212,6 +212,19 @@ private static bool ConditionMet(Route r)
 
 **결과** — 최적화 대상을 사람의 감이 아니라 리포트 기준으로 관리하게 되었습니다.
 
+**출시 전 성능 분석 (2026.10)** — 출시를 앞두고 Unity Profiler, Memory Profiler, Build Report로 실행부터 인게임까지 측정해 병목을 수치로 정리하고, 개선 우선순위를 팀 회의에서 공유했습니다. 현재 분석을 마치고 출시 전 적용을 준비하고 있습니다.
+
+- **실행 직후 4초 멈춤** — 첫 프레임이 4,030ms. VolFx의 `NoiseTexGenerator`가 메인 스레드에서 `Mathf.PerlinNoise`와 `Texture2D.SetPixel`로 노이즈 텍스처를 픽셀 단위로 생성하는 것이 원인. 텍스처를 미리 에셋으로 만들어 로드하고, 런타임 생성이 불가피한 경우 `SetPixels32`·`GetRawTextureData`로 한 번에 쓰는 방식으로 개선 예정
+- **씬 전환 끊김** — 인게임 씬 전환 시 0.53초 + 0.34초의 프레임 정지. 에셋 통합, 대량의 `Debug.Log`, 첫 렌더링이 각각 수백 ms를 차지하는 것을 확인
+- **설치 용량** — 설치 용량 6.0GB 중 텍스처가 4.9GB이며, 그중 88%(4.3GB)가 비압축 RGBA32. 263장(1.75GB)은 즉시 BC7로 변환하고, 가로세로가 4의 배수가 아닌 1,685장은 크기를 조정한 뒤 압축. 약 29Mbps인 영상을 8~10Mbps로 재인코딩해 **6GB → 2~3GB** 축소 예상
+- **저사양 대응** — 인게임 텍스처 메모리 1.44GB(최대 1.56GB), 화질 옵션은 Very High·Ultra 두 가지뿐. Baked GI가 꺼져 있어 컷신당 최대 115개의 조명이 실시간으로 계산되고, 풀스크린 이펙트 17개가 상시 활성화된 상태로, 화질 옵션(Render Scale 등) 추가와 Baked GI 재적용을 계획
+
+<img src="/images/killa-profiler-timeline.webp" alt="실행부터 인게임까지 프레임별 CPU 소요 시간" loading="lazy" decoding="async" />
+
+<img src="/images/killa-profiler-volfx.webp" alt="첫 프레임 메인 스레드 소요 시간 상위 함수" loading="lazy" decoding="async" />
+
+*(Unity Profiler 실측 — Development 빌드, RTX 4070 Laptop)*
+
 ## 4. 배포 · 빌드 파이프라인
 
 **문제** — 전시용, QA용, 출시용 빌드마다 시작 지점과 설정이 달라 매번 수동으로 변경해야 했고, 작은 실수가 빌드 사고로 이어졌습니다.
