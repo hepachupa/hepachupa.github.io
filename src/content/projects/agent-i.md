@@ -1,27 +1,34 @@
 ---
 title: Agent.I — LLM 사이비 마을 게임
-summary: Generative Agents를 적용한 Human-like NPC 14명이 스스로 생각하고 움직이는 마을에서, AI가 결정한 NPC의 행동이 게임의 승패를 가르는 사회 시뮬레이션 게임.
-start: 2023-03-01
-end: 2023-12-01
+summary: Generative Agents를 적용한 Human-like NPC 14명이 스스로 생각하고 움직이는 마을에서, AI가 결정한
+  NPC의 행동이 게임의 승패를 가르는 사회 시뮬레이션 게임.
+start: 2023-09-01
+end: 2024-07-01
+ongoing: false
 featured: true
-tags: [Unity, C#, LLM, OpenAI API, Generative Agents, AI NPC, 팀 프로젝트]
-thumbnail: /images/agent-i.webp
+hidden: false
 role: 클라이언트 개발 — 맵, NPC 대화 기능, AI 행동의 게임 내 반영
-team: 스윗팡이크루 3인 (이화여대 캡스톤)
-contribution: ""
+team: 스윗팡이크루 3인 (이화여대 캡스톤 프로젝트)
+tags:
+  - Unity
+  - C#
+  - LLM
+  - OpenAI API
+  - Generative Agents
+  - AI NPC
+  - 팀 프로젝트
+thumbnail: /images/agent-i.webp
+video: https://youtu.be/wx33X7C4dhs
 highlights:
   - 챗봇형 AI NPC를 넘어, LLM이 결정한 NPC의 행동이 게임 승패를 결정하는 구조 (14명 중 7명 이상 집회 참석 시 패배)
   - 서버의 LLM 판단(행동·이모지·장소·대화)을 Unity에서 NavMesh 이동·말풍선·대화 연출로 재생하는 클라이언트 담당
   - NPC 지각(Perceive) 데이터를 게임 월드에서 수집해 서버로 보내는 쪽과, 플레이어 ↔ NPC 자유 대화 기능 구현
   - 플레이테스트 24명 중 91.7%가 "생성형 AI NPC가 다채로운 플레이를 제공한다", 95.8%가 "새로운 재미를 느꼈다"고 응답
   - NPC 인터뷰로 검증 — 집회 참석 NPC 3명 모두 "다른 NPC와의 대화로 소식을 들었다"고 답해, NPC 간 정보 확산을 확인
-video: https://youtu.be/wx33X7C4dhs
-gallery: []
 links:
   - label: GitHub (클라이언트)
     url: https://github.com/hepachupa/Frontend_Demo
 ---
-
 ## 문제: 게임 NPC는 왜 늘 같은 말만 할까
 
 기존 게임 NPC는 **고정된 선택지**로만 대화합니다. 소통은 일방향이고, 모든 유저가 같은 내용을 플레이하게 되어 참여도와 세계관의 신뢰도가 떨어집니다. 시장의 AI NPC도 대부분 **챗봇 단계**에 머물러, 말은 자유롭지만 게임에는 아무 영향을 주지 못합니다.
@@ -36,11 +43,13 @@ AI를 섬기는 사이비 종교의 '나주교'가 8월 1일 자정에 종교 �
 
 Stanford의 *Generative Agents* (Park et al., 2023)를 기반으로, NPC마다 페르소나와 기억을 갖고 LLM으로 사고하게 했습니다.
 
+
 | 단계 | 내용 |
-|---|---|
+| ----------------- | --------------------------------- |
 | **Perceive** | 주변의 다른 NPC, 현재 장소와 시간을 인식 |
 | **Memory System** | 저장된 기억과 페르소나로 사람처럼 새로운 정보를 추론 |
 | **Act** | 장소 이동, 행동(이모지 + 텍스트), 다른 NPC와의 대화 |
+
 
 LLM이 만들어 내는 결과는 네 가지입니다.
 
