@@ -78,6 +78,64 @@ LLM이 만들어 내는 결과는 네 가지입니다.
 **맵과 NPC**
 - 2D 타일맵 마을과 LLM이 참조하는 장소 구성, 시간대별 행동 루틴, 방향별 걷기 애니메이션
 
+## 핵심 코드: LLM의 텍스트를 게임 행동으로
+
+서버의 LLM은 행동을 `"<persona> 오화가"`(오화가와 대화) 또는 `"<location> 교회"`(교회로 이동) 같은 **문자열**로 돌려줍니다. 아래는 이 문자열을 해석해 NPC의 실제 행동으로 바꾸는 부분입니다. ([GameManager.cs 원본](https://github.com/hepachupa/Frontend_Demo/blob/main/Assets/02.Scripts/_JW/NPC/GameManager.cs)에서 발췌. 가독성을 위해 디버그 로그를 빼고 변수명 일부를 줄였습니다)
+
+```csharp
+// 1) 행동 문자열에서 태그와 내용을 분리
+//    "<persona> 오화가" → ("persona", "오화가") / "<location> 교회" → ("location", "교회")
+private (string tag, string content) ExtractTagAndContent(string input)
+{
+    string pattern = @"<(persona|location)>\s*([^<]*)";
+    Match match = Regex.Match(input, pattern);
+    if (match.Success)
+        return (match.Groups[1].Value.Trim(), match.Groups[2].Value.Trim());
+    return (null, null);
+}
+
+// 2) 태그에 따라 대화 또는 이동으로 분기 (applyMovement 중)
+(string tag, string content) = ExtractTagAndContent(personaList[npcIndex].ActAddress);
+if (tag == "persona")
+{
+    otherNpcIndex = FindNPCIndex(content);
+    NPC[npcIndex].isWaiting = true;
+    NPC[otherNpcIndex].isWaiting = true;
+
+    // 두 이름을 정렬해 키를 만들어, A→B와 B→A를 같은 대화로 취급
+    string me = NPC[npcIndex].gameObject.name;
+    string first  = me.CompareTo(content) < 0 ? me : content;
+    string second = me.CompareTo(content) < 0 ? content : me;
+    string conversationPair = $"{first}-{second}";
+
+    if (!conversationPairs.Contains(conversationPair))
+    {
+        conversationPairs.Add(conversationPair);
+        chatManager.LoadDialogue(personaList[npcIndex].Chat, npcIndex, otherNpcIndex);
+    }
+}
+else if (tag == "location")
+{
+    NPC[npcIndex].locationTag = true;
+    AddLocation(content, npcIndex);
+}
+
+// 3) LLM이 말한 장소 이름 → 맵의 실제 위치로 연결해 이동 대기열에 추가
+private void AddLocation(string nextLocation, int npcIndex)
+{
+    foreach (var nl in location)
+    {
+        if (nl.gameObject.name == nextLocation)
+        {
+            NPC[npcIndex].AddWaypoint(nl, 10); // 도착 후 10초 머묾
+            break;
+        }
+    }
+}
+```
+
+**지금 다시 짠다면** — 장소와 NPC를 이름 문자열로 매번 순회해 찾는 대신 `Dictionary`로 바꾸고, 같은 두 NPC가 다시 대화할 수 있도록 대화 쌍 기록에 쿨타임을 두겠습니다. 또 LLM이 맵에 없는 장소 이름을 돌려주는 경우를 대비해, 찾지 못하면 가장 가까운 장소로 보내는 예외 처리를 추가하겠습니다.
+
 ## 검증
 
 - **플레이테스트 (24명)** — 91.7%가 "생성형 AI NPC가 다채로운 게임 플레이를 제공한다", 95.8%가 "생성형 AI가 새로운 재미를 줬다"고 응답
