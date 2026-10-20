@@ -4,7 +4,7 @@ summary: 컴퓨터공학과 캡스톤 프로젝트로 LLM 생성형 에이전트
 start: 2023-09-01
 end: 2024-07-01
 organization: 이화여자대학교 컴퓨터공학과
-role: 클라이언트 개발 (맵 · NPC 대화 · AI 행동 반영)
+role: 클라이언트 개발 (LLM 응답 ↔ 게임 월드 데이터 계층, 맵)
 related: agent-i
 tags: [LLM, 캡스톤]
 ---
