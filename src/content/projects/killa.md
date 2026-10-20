@@ -94,13 +94,17 @@ Unity 6 (URP) · C# · PixelCrushers Dialogue System / Save System (Lua 변수) 
 - Spine 애니메이션과 Cinemachine 카메라 연출로 스테이지를 구성하고, 플레이어가 NPC와 직접 상호작용한다고 느끼도록 콘텐츠별 연출 설계
 - 전시에서 반응이 밋밋한 구간을 찾아 애니메이션과 셰이더를 추가해 긴장감과 깊이감을 보강 — 이후 전시에서 "화면이 풍부해졌다"는 평가
 
+![KILLA 기호 조합 장면 연출](/images/killa-symbol-fx.webp)
+
+*기호 조합 장면 — Spine 애니메이션과 셰이더·포스트 프로세싱 연출*
+
 ![KILLA 추리 장면 연출](/images/killa-stage-fx.webp)
 
 *추리 장면 — Spine 애니메이션과 셰이더·포스트 프로세싱 연출*
 
-![KILLA 증거 선택 UI 연출](/images/killa-evidence-ui.webp)
+![KILLA 증거 선택 UI 연출](/images/killa-evidence-ui-v2.webp)
 
-*증거 선택 UI — 필름 스트립 연출과 선택지 강조 효과*
+*증거 선택 UI — 필름 스트립 위로 증거를 배치하는 연출*
 
 *(Unity 에디터 캡처)*
 
