@@ -26,6 +26,7 @@ highlights:
   - 2026년 3월 TOEI와 퍼블리싱 계약 체결 — 인디 프로젝트를 상용 출시 단계까지 끌어올림
   - Steam 데모 공개, 한국어·영어·일본어·중국어 간체/번체 5개 언어 지원
   - GIGDC 일반부문 대상 · SQOOL Award 대상 · 반다이남코 GYAAR Studio 콘테스트 2등 등 수상·선정 13건
+  - 도쿄게임쇼·gamescom·BitSummit·타이베이 게임쇼 등 5개국 전시 30회 이상
   - 출시 파이프라인 직접 구축 — 씬 최적화, Normal/GameShow/QA 3종 빌드, Steamworks 연동, QA 전용 빌드·툴
   - Unity MCP로 AI 에이전트를 에디터에 연결해 최적화 감사·리팩터링·QA 툴 제작에 활용하고, 도구의 한계를 문서화해 팀 워크플로로
     정립
@@ -45,6 +46,25 @@ Unity 6 (URP) · C# · PixelCrushers Dialogue System / Save System (Lua 변수) 
 ## 퍼블리싱: 인디 프로젝트에서 상용 출시로
 
 교내 지원사업과 공모전으로 시작한 KILLA는 국내외 수상·선정 13건으로 완성도를 검증받았고, 2026년 3월 **TOEI와 퍼블리싱 계약**을 맺었습니다. 퍼블리셔와 일하면서 "재미있는 데모"가 아니라 **일정 안에 안정적으로 출시되는 빌드**를 만드는 것이 클라이언트 개발자의 일이 되었습니다. 아래는 그 과정에서 맡은 일입니다.
+
+## 전시 이력 — 30회 이상 · 5개국
+
+**해외**
+- 도쿄게임쇼 2024 **Selected Indie 80** (일본)
+- 도쿄게임쇼 2025 · 2026 (일본) — 2026년은 TOEI GAMES 부스
+- **gamescom 2024** Indie Arena Booth (독일)
+- BitSummit Drift 2024 · BitSummit PUNCH 2026 (일본 교토)
+- Taipei Game Show 2025 (대만)
+- Tokyo Indie Games Summit 2025 (일본)
+- LA COMIC-CON (미국), ANIMAGIC (독일)
+
+**국내**
+- G-STAR 2023 · 2024 인디 쇼케이스
+- BIC 2023 · 2026 (부산인디커넥트 페스티벌)
+- 버닝비버 2023 · 2024 — 2년 연속 '올해의 버닝비버'
+- 플레이엑스포 2024 Indie Arcade
+
+외 일러스타 페스, 서울팝콘, GXG, GLS, UGDAP, 도쿄 게임 던전, GAME AiCON 등
 
 ## 1. 최적화
 
