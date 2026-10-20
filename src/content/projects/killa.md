@@ -85,7 +85,7 @@ Unity 6 (URP) · C# · PixelCrushers Dialogue System / Save System (Lua 변수) 
 
 **결과** — 2022년부터 개발해 온 프로젝트를 8개월 만에 회차 플레이 구조로 전면 개편했습니다.
 
-**코드: 스토리 단계를 데이터로 관리 — `StoryLayerController`**
+#### 코드: 스토리 단계를 데이터로 관리 — `StoryLayerController`
 
 씬마다 조건문을 분산하는 대신, 스토리 단계 이름과 **같은 이름의 오브젝트 묶음만 활성화하는** 방식으로 분기를 단순화했습니다. 시나리오가 늘어도 씬에 레이어 오브젝트만 추가하면 되며, 코드는 수정할 필요가 없습니다.
 
@@ -142,7 +142,7 @@ public class StoryLayerController : MonoBehaviour
 
 </details>
 
-**코드: 조건부 씬 이동 — `PortalStoryRouter`**
+#### 코드: 조건부 씬 이동 — `PortalStoryRouter`
 
 같은 문이라도 스토리 단계, 퀘스트 상태, 변수에 따라 다른 목적지로 이동시켜야 했습니다. **조건이 있는 경로는 배열 순서대로 우선 검사**하고, 하나도 맞지 않으면 **조건 없는 기본 경로**로 이동하도록 설계해, 기획자가 인스펙터에서 경로를 추가하는 것만으로 분기를 만들 수 있게 했습니다.
 
@@ -272,7 +272,7 @@ private static bool ConditionMet(Route r)
 
 **결과** — 빌드 종류를 설정만으로 전환할 수 있게 되어 BIC 등 전시와 QA 빌드를 코드 수정 없이 내보냈습니다.
 
-**코드: 어디서든 시작하는 빌드 — `BuildConfig.StartPoint`**
+#### 코드: 어디서든 시작하는 빌드 — `BuildConfig.StartPoint`
 
 전시·QA 빌드를 코드 수정 없이 만들기 위해, "어디서부터 시작할지"를 **씬 + 스토리 단계 + 스폰 위치 + 날짜 + 초기 Lua**의 데이터 묶음으로 정의했습니다. ScriptableObject 하나로 Normal / GameShow / QA 모드를 전환합니다.
 

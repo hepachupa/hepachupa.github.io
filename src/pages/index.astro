@@ -171,6 +171,8 @@ const updated = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
       store.set('theme', next);
     });
     $('#print-btn')?.addEventListener('click', () => window.print());
+    // 문단이 굵은 라벨(문제·해결 등)로 시작하면 라벨만 강조
+    document.querySelectorAll('.prose p').forEach((p) => { const f = p.firstChild; if (f && f.nodeName === 'STRONG') p.classList.add('lead-label'); });
     // 인쇄(PDF) 시 접힌 코드도 모두 펼침
     window.addEventListener('beforeprint', () => document.querySelectorAll('details.code-fold').forEach((d) => (d.open = true)));
 
