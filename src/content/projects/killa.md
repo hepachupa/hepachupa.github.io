@@ -194,17 +194,11 @@ private static bool ConditionMet(Route r)
 
 <img src="/images/killa-symbol-fx.webp" alt="KILLA 기호 조합 장면 연출" loading="lazy" decoding="async" />
 
-*기호 조합 장면 — Spine 애니메이션과 셰이더·포스트 프로세싱 연출*
-
 <img src="/images/killa-stage-fx.webp" alt="KILLA 추리 장면 연출" loading="lazy" decoding="async" />
-
-*추리 장면 — Spine 애니메이션과 셰이더·포스트 프로세싱 연출*
 
 <img src="/images/killa-evidence-ui-v2.webp" alt="KILLA 증거 선택 UI 연출" loading="lazy" decoding="async" />
 
-*증거 선택 UI — 필름 스트립 위로 증거를 배치하는 연출*
-
-*(Unity 에디터 캡처)*
+*(현재 공개 가능 자료 - Unity 에디터 캡처)*
 
 ## 3. 최적화
 
