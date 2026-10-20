@@ -82,7 +82,7 @@ main, .topbar, .site-footer { max-width: 1120px; margin: 0 auto; padding-inline:
 @media (max-width: 760px) { .brand-en { display: none; } }
 .eyebrow { color: var(--accent); font-weight: 600; font-size: 14px; margin: 0 0 12px; letter-spacing: 0.02em; }
 .hero h1 { white-space: pre-line; font-size: clamp(30px, 5vw, 48px); line-height: 1.2; letter-spacing: -0.03em; margin: 0 0 16px; }
-.intro { color: var(--muted); font-size: 17px; max-width: 46ch; margin: 0 0 24px; }
+.intro { white-space: pre-line; color: var(--muted); font-size: 17px; max-width: 46ch; margin: 0 0 24px; }
 .hero-links { display: flex; flex-wrap: wrap; gap: 8px; }
 .btn {
   display: inline-flex; align-items: center; gap: 6px;

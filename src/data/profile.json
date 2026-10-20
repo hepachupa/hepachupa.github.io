@@ -1,11 +1,12 @@
 {
   "name": "장재원",
-  "name_en": "Jaewon Chang",
   "role": "Unity 게임 클라이언트 개발자",
   "headline": "개발부터 출시까지,\n변화에 유연하게 적응하는 클라이언트 개발자",
-  "intro": "PC 미스터리 어드벤처, 모바일 탄막 슈팅, 발달장애 아동을 위한 기능성 게임, LLM 에이전트가 움직이는 시뮬레이션까지 — 장르와 플랫폼이 다른 프로젝트에서 Unity 클라이언트를 맡아 왔습니다. 대표작 KILLA는 TOEI Games퍼블리싱과 수상·선정 13건으로 이어졌고, 그 과정에서 최적화·배포·QA까지 출시의 전 과정을 경험했습니다. 생성형 AI가 등장한 뒤에는 LLM NPC를 게임에 붙여 보고, AI 에이전트를 Unity 에디터에 연결해 일하는 방식 자체를 바꿔 왔습니다.",
+  "intro": "PC 미스터리 어드벤처, 모바일 탄막 슈팅, 발달장애 아동을 위한 기능성 게임, LLM 에이전트가 움직이는 시뮬레이션까지 —\n\n장르와 플랫폼이 다른 프로젝트에서 Unity 클라이언트를 맡아 왔습니다. 대표작 KILLA는 TOEI Games 퍼블리싱과 수상·선정 13건으로 이어졌고, 그 과정에서 최적화·배포·QA까지 출시의 전 과정을 경험했습니다. 생성형 AI가 등장한 뒤에는 LLM NPC를 게임에 붙여 보고, AI 에이전트를 Unity 에디터에 연결해 일하는 방식 자체를 바꿔 왔습니다.",
   "email": "hepachupa@gmail.com",
   "github": "https://github.com/hepachupa",
+  "blog": "",
+  "resume": "",
   "hero_video": "https://www.youtube.com/watch?v=tFxTB1mJmiE",
   "skills": [
     "Unity 6 / URP",
@@ -20,5 +21,7 @@
     "LLM API 연동"
   ],
   "seo_description": "장재원 (Jaewon Chang) — 개발부터 출시까지, 변화에 유연하게 적응하는 Unity 클라이언트 개발자. KILLA (TOEI 퍼블리싱, 수상·선정 13건), LLM 에이전트 게임 Agent.I 외",
-  "og_image": "/og-v3.png"
+  "og_image": "/og-v3.png",
+  "umami_website_id": "",
+  "name_en": "Jaewon Chang"
 }

@@ -14,7 +14,7 @@ content:
       - { name: name_en, label: 영문 이름, type: string }
       - { name: role, label: 직무 (작은 주황 글씨), type: string }
       - { name: headline, label: 큰 제목 (Enter로 줄바꿈), type: text }
-      - { name: intro, label: 소개 문단, type: text }
+      - { name: intro, label: 소개 문단 (Enter로 줄바꿈), type: text }
       - { name: email, label: 이메일, type: string }
       - { name: github, label: GitHub 주소, type: string }
       - { name: blog, label: 블로그 주소 (선택), type: string }
