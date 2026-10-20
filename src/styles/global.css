@@ -7,9 +7,9 @@
   --border: #2d2c34;
   --text: #eceaf1;
   --muted: #9b98a8;
-  --accent: #ff8a3d;          /* 메인 포인트 컬러 */
-  --accent-ink: #1a1007;
-  --k-project: #ff8a3d;
+  --accent: #F9423A;          /* 메인 포인트 컬러 (KRAFTON red) */
+  --accent-ink: #ffffff;
+  --k-project: #F9423A;
   --k-award: #f2c14e;
   --k-activity: #63c58a;
   --shadow: 0 10px 30px rgb(0 0 0 / 0.35);
@@ -22,9 +22,9 @@
   --border: #e3e0d9;
   --text: #1b1a20;
   --muted: #6a6775;
-  --accent: #e2650c;
+  --accent: #E0362E;
   --accent-ink: #ffffff;
-  --k-project: #e2650c;
+  --k-project: #E0362E;
   --k-award: #b98a0b;
   --k-activity: #2f9a5b;
   --shadow: 0 10px 30px rgb(30 20 10 / 0.08);
@@ -311,7 +311,7 @@ dialog::backdrop { background: rgb(0 0 0 / .6); backdrop-filter: blur(3px); }
 
 /* ───────── 인쇄 / PDF 저장: 모든 상세를 펼쳐서 출력 ───────── */
 @media print {
-  :root, :root[data-theme] { --bg: #fff; --surface: #fff; --surface-2: #f3f3f3; --border: #ddd; --text: #111; --muted: #555; --accent: #d35400; --accent-ink: #fff; color-scheme: light; }
+  :root, :root[data-theme] { --bg: #fff; --surface: #fff; --surface-2: #f3f3f3; --border: #ddd; --text: #111; --muted: #555; --accent: #D9342C; --accent-ink: #fff; color-scheme: light; }
   html, body { background: #fff; }
   .topbar, .view-toggle, .tabs, .tag-filter, .result-count, .stats, .block:has(.featured), #work .list, .empty, dialog, .yt-play, .video, .video-file { display: none !important; }
   .hero { padding-top: 0; grid-template-columns: 1fr !important; }
