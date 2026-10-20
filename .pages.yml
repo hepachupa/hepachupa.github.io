@@ -12,7 +12,8 @@ content:
     fields:
       - { name: name, label: 이름, type: string, required: true }
       - { name: name_en, label: 영문 이름, type: string }
-      - { name: role, label: 직무 (작은 주황 글씨), type: string }
+      - { name: role, label: 직무 (작은 강조 글씨), type: string }
+      - { name: education, label: 학력 (예 OO대학교 OO학과 · 2026.09 졸업), type: string }
       - { name: headline, label: 큰 제목 (Enter로 줄바꿈), type: text }
       - { name: intro, label: 소개 문단 (Enter로 줄바꿈), type: text }
       - { name: email, label: 이메일, type: string }
@@ -38,6 +39,7 @@ content:
     fields:
       - { name: title, label: 제목, type: string, required: true }
       - { name: summary, label: 한 줄 요약, type: text }
+      - { name: tldr, label: 상세 맨 위 핵심 요약 (3줄 권장), type: string, list: true }
       - { name: start, label: 시작일, type: date, required: true }
       - { name: end, label: 종료일 (비우면 단일 날짜), type: date }
       - { name: ongoing, label: 진행 중, type: boolean }

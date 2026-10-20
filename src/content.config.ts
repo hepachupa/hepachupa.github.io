@@ -14,6 +14,7 @@ const link = z.object({ label: z.string(), url: z.string() });
 const item = z.object({
   title: z.string(),
   summary: optStr,
+  tldr: z.array(z.string()).optional().nullable().transform((v) => (v ?? []).filter(Boolean)), // 상세 맨 위 3줄 요약
   start: z.coerce.date(),
   end: optDate,
   ongoing: z.boolean().optional().default(false),

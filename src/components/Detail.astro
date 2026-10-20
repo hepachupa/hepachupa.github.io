@@ -23,6 +23,9 @@ const facts: [string, string | undefined][] = [
     <span class:list={['kind-pill', `k-${kind}`]}>{KIND_LABEL[kind]}</span>
     <h2>{d.title}</h2>
     {d.summary && <p class="lead">{d.summary}</p>}
+    {d.tldr.length > 0 && (
+      <ul class="tldr">{d.tldr.map((t: string) => <li>{t}</li>)}</ul>
+    )}
   </header>
 
   {d.video ? (
