@@ -1,9 +1,9 @@
 ---
-title: 2023 Burning Beaver 올해의 버닝비버
-summary: 2023 버닝비버 인디게임 페스티벌 '올해의 버닝비버' 수상
+title: 버닝비버 2023 올해의 버닝비버
+summary: "스마일게이트 인디게임 페스티벌 버닝비버 2023 올해의 버닝비버"
 start: 2023-12-01
-organizer: "Burning Beaver"
-result: 올해의 버닝비버
+organizer: "주최·주관: 스마일게이트 퓨처랩"
+result: "올해의 버닝비버"
 related: killa
 tags: [KILLA, 수상, 전시]
 thumbnail: ""

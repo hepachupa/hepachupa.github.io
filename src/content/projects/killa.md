@@ -25,7 +25,7 @@ video: https://www.youtube.com/watch?v=tFxTB1mJmiE
 highlights:
   - 2026년 3월 TOEI와 퍼블리싱 계약 체결 — 인디 프로젝트를 상용 출시 단계까지 끌어올림
   - Steam 데모 공개, 한국어·영어·일본어·중국어 간체/번체 5개 언어 지원
-  - GIGDC 일반부문 대상 · SQOOL Award 대상 · 반다이남코 GYAAR Studio Award 2등 등 수상·선정 13건
+  - GIGDC 일반부문 대상 · SQOOL Award 대상 · 반다이남코 GYAAR Studio 콘테스트 2등 등 수상·선정 13건
   - 출시 파이프라인 직접 구축 — 씬 최적화, Normal/GameShow/QA 3종 빌드, Steamworks 연동, QA 전용 빌드·툴
   - Unity MCP로 AI 에이전트를 에디터에 연결해 최적화 감사·리팩터링·QA 툴 제작에 활용하고, 도구의 한계를 문서화해 팀 워크플로로
     정립
