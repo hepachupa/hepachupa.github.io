@@ -32,6 +32,7 @@ highlights:
   - 단방향 진행 구조를 회차 플레이 구조로 8개월 만에 전면 개편 — 씬 30개 이상을 약 15개로 재구성, 상태 변수 약 130개 통합
   - 3D 사이드뷰 · 2D 화면 · 3인칭 쿼터뷰를 오가는 시점 구조 구현, Spine·카메라·셰이더 연출
   - 대사별 FMOD 효과음 자동 재생 툴 제작 — 씬·코드 수정 없이 대화 데이터만으로 사운드 반영
+  - Profiler A/B 측정으로 시작 시 메인 스레드 멈춤 제거 — 노이즈 생성 352ms → 0ms, 시작 직후 프레임 −44%
   - 2026년 3월 TOEI와 퍼블리싱 계약 체결 — 인디 프로젝트를 상용 출시 단계까지 끌어올림
   - Steam 데모 공개, 한국어·영어·일본어·중국어 간체/번체 5개 언어 지원
   - GIGDC 일반부문 대상 · SQOOL Award 대상 · 반다이남코 GYAAR Studio 콘테스트 2등 등 수상·선정 13건
@@ -212,18 +213,38 @@ private static bool ConditionMet(Route r)
 
 **결과** — 최적화 대상을 사람의 감이 아니라 리포트 기준으로 관리하게 되었습니다.
 
-**출시 전 성능 분석 (2026.10)** — 출시를 앞두고 Unity Profiler, Memory Profiler, Build Report로 실행부터 인게임까지 측정해 병목을 수치로 정리하고, 개선 우선순위를 팀 회의에서 공유했습니다. 현재 분석을 마치고 출시 전 적용을 준비하고 있습니다.
+**시작 시 메인 스레드 멈춤 제거 — 노이즈 생성 352ms → 0ms**
 
-- **실행 직후 4초 멈춤** — 첫 프레임이 4,030ms. VolFx의 `NoiseTexGenerator`가 메인 스레드에서 `Mathf.PerlinNoise`와 `Texture2D.SetPixel`로 노이즈 텍스처를 픽셀 단위로 생성하는 것이 원인. 텍스처를 미리 에셋으로 만들어 로드하고, 런타임 생성이 불가피한 경우 `SetPixels32`·`GetRawTextureData`로 한 번에 쓰는 방식으로 개선 예정
-- **씬 전환 끊김** — 인게임 씬 전환 시 0.53초 + 0.34초의 프레임 정지. 에셋 통합, 대량의 `Debug.Log`, 첫 렌더링이 각각 수백 ms를 차지하는 것을 확인
+**문제** — 출시를 앞두고 Development 빌드를 Profiler로 측정하자, 첫 프레임에서 후처리 플러그인 VolFx의 `NoiseTexGenerator.PerlinTex()`가 약 4초를 차지했습니다.
+
+**원인** — VolFx Warp 패스가 렌더러를 생성할 때 2048² 노이즈 텍스처를 `Mathf.PerlinNoise`와 `Texture2D.SetPixel` 4,194,304회 호출로 메인 스레드에서 만들고 있었습니다. Warp를 쓰는 씬은 하나뿐이었지만 시작할 때마다 무조건 실행되었습니다.
+
+**해결** — 같은 값을 에디터에서 R8 텍스처로 미리 베이크해 렌더러에 직렬화 참조로 연결했습니다. 생성 시점만 늦추면 멈춤이 해당 씬 진입 시점으로 옮겨갈 뿐이라 택하지 않았고, 참조가 빠진 경우에만 일괄 쓰기로 1회 생성하는 비상 경로를 두었습니다. Gamma 색공간에서 셰이더가 R 채널만 읽는 것을 확인해 RGBA32를 R8로 줄였고, 4,194,304픽셀을 원본과 비교해 차이가 0임을 검증했습니다.
+
+**검증** — 같은 빌드에서 실행 옵션으로 원본(A)과 개선(B)을 전환하는 A/B 자동 측정 도구를 만들어 각 3회 측정했습니다.
+
+| 지표 | 원본 | 개선 | 차이 |
+|---|---|---|---|
+| 노이즈 생성 (Profiler 마커) | 352ms | 0ms | 제거 |
+| 시작 직후 두 번째 프레임 | 766ms | 425ms | −44% |
+| 노이즈 텍스처 메모리 | 16MB (RGBA32) | 4MB (R8) | −75% |
+
+*i7-13700F / RTX 5060, Unity 6000.3, Development 빌드(Deep Profiling 미사용), 1920×1080 기준*
+
+<img src="/images/killa-perf-timeline.webp" alt="시작 직후 두 번째 프레임 Profiler Timeline 전후 비교" loading="lazy" decoding="async" />
+
+<img src="/images/killa-perf-hierarchy.webp" alt="시작 직후 두 번째 프레임 Profiler Hierarchy 전후 비교" loading="lazy" decoding="async" />
+
+*같은 빌드의 원본(위)과 개선(아래)을 Profiler로 캡처한 시작 직후 두 번째 프레임 — 노이즈 생성 구간(KILLA.WarpPass.LegacyNoise, 352ms)이 사라짐*
+
+**발견** — 같은 코드가 Deep Profiling 빌드에서는 3,227ms가 걸렸습니다. 처음 본 '4초 멈춤'은 수백만 번의 작은 C# 호출에 계측 비용이 더해진 값이었습니다. 이후 문제 위치는 Deep Profiling으로 찾고, 개선 폭은 일반 빌드와 직접 추가한 `ProfilerMarker`로 측정한다는 원칙을 세웠습니다.
+
+**남은 개선 과제 (분석 완료, 출시 전 적용 예정)** — 같은 측정 도구로 다음 병목을 수치로 정리했습니다.
+
+- **첫 씬 로드 약 1.85초** — `DialogueSystemController.Awake` 699ms(그중 프리팹 생성 556ms), Debug.Log 출력이 대부분인 `PlayerProfile.Awake` 250ms
+- **씬 전환 끊김** — 인게임 씬 전환 시 0.53초 + 0.34초의 프레임 정지. 에셋 통합, 대량의 `Debug.Log`, 첫 렌더링이 각각 수백 ms를 차지
 - **설치 용량** — 설치 용량 6.0GB 중 텍스처가 4.9GB이며, 그중 88%(4.3GB)가 비압축 RGBA32. 263장(1.75GB)은 즉시 BC7로 변환하고, 가로세로가 4의 배수가 아닌 1,685장은 크기를 조정한 뒤 압축. 약 29Mbps인 영상을 8~10Mbps로 재인코딩해 **6GB → 2~3GB** 축소 예상
 - **저사양 대응** — 인게임 텍스처 메모리 1.44GB(최대 1.56GB), 화질 옵션은 Very High·Ultra 두 가지뿐. Baked GI가 꺼져 있어 컷신당 최대 115개의 조명이 실시간으로 계산되고, 풀스크린 이펙트 17개가 상시 활성화된 상태로, 화질 옵션(Render Scale 등) 추가와 Baked GI 재적용을 계획
-
-<img src="/images/killa-profiler-timeline.webp" alt="실행부터 인게임까지 프레임별 CPU 소요 시간" loading="lazy" decoding="async" />
-
-<img src="/images/killa-profiler-volfx.webp" alt="첫 프레임 메인 스레드 소요 시간 상위 함수" loading="lazy" decoding="async" />
-
-*(Unity Profiler 실측 — Development 빌드, RTX 4070 Laptop)*
 
 ## 4. 배포 · 빌드 파이프라인
 
