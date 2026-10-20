@@ -207,13 +207,15 @@ private static bool ConditionMet(Route r)
 
 ## 3. 최적화
 
+### 3-1. 씬 최적화 감사 툴
+
 **문제** — 장소(LOC) 씬이 늘어나면서 씬마다 불필요한 컴포넌트, 중복 라이트·볼륨, 미사용 오브젝트가 쌓였고, 수작업으로 확인하기에는 씬 수가 많았습니다.
 
 **해결** — 씬을 자동으로 검사해 문제 항목을 리포트하는 에디터 툴 `SceneOptimAudit`을 만들고, 여러 LOC 씬에 일괄 최적화 패스를 진행했습니다. 구버전 Post Processing Stack v2 설정은 URP Volume Profile로 이관했습니다.
 
 **결과** — 최적화 대상을 사람의 감이 아니라 리포트 기준으로 관리하게 되었습니다.
 
-**시작 시 메인 스레드 멈춤 제거 — 노이즈 생성 352ms → 0ms**
+### 3-2. 시작 시 메인 스레드 멈춤 제거 — 노이즈 생성 352ms → 0ms
 
 **문제** — 출시를 앞두고 Development 빌드를 Profiler로 측정하자, 첫 프레임에서 후처리 플러그인 VolFx의 `NoiseTexGenerator.PerlinTex()`가 약 4초를 차지했습니다.
 
@@ -238,13 +240,6 @@ private static bool ConditionMet(Route r)
 *같은 빌드의 원본(위)과 개선(아래)을 Profiler로 캡처한 시작 직후 두 번째 프레임 — 노이즈 생성 구간(KILLA.WarpPass.LegacyNoise, 352ms)이 사라짐*
 
 **발견** — 같은 코드가 Deep Profiling 빌드에서는 3,227ms가 걸렸습니다. 처음 본 '4초 멈춤'은 수백만 번의 작은 C# 호출에 계측 비용이 더해진 값이었습니다. 이후 문제 위치는 Deep Profiling으로 찾고, 개선 폭은 일반 빌드와 직접 추가한 `ProfilerMarker`로 측정한다는 원칙을 세웠습니다.
-
-**남은 개선 과제 (분석 완료, 출시 전 적용 예정)** — 같은 측정 도구로 다음 병목을 수치로 정리했습니다.
-
-- **첫 씬 로드 약 1.85초** — `DialogueSystemController.Awake` 699ms(그중 프리팹 생성 556ms), Debug.Log 출력이 대부분인 `PlayerProfile.Awake` 250ms
-- **씬 전환 끊김** — 인게임 씬 전환 시 0.53초 + 0.34초의 프레임 정지. 에셋 통합, 대량의 `Debug.Log`, 첫 렌더링이 각각 수백 ms를 차지
-- **설치 용량** — 설치 용량 6.0GB 중 텍스처가 4.9GB이며, 그중 88%(4.3GB)가 비압축 RGBA32. 263장(1.75GB)은 즉시 BC7로 변환하고, 가로세로가 4의 배수가 아닌 1,685장은 크기를 조정한 뒤 압축. 약 29Mbps인 영상을 8~10Mbps로 재인코딩해 **6GB → 2~3GB** 축소 예상
-- **저사양 대응** — 인게임 텍스처 메모리 1.44GB(최대 1.56GB), 화질 옵션은 Very High·Ultra 두 가지뿐. Baked GI가 꺼져 있어 컷신당 최대 115개의 조명이 실시간으로 계산되고, 풀스크린 이펙트 17개가 상시 활성화된 상태로, 화질 옵션(Render Scale 등) 추가와 Baked GI 재적용을 계획
 
 ## 4. 배포 · 빌드 파이프라인
 
