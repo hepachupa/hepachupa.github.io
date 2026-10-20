@@ -1,6 +1,7 @@
 ---
 title: KILLA
-summary: 한국형 미스터리 비주얼노벨 어드벤처. 팀의 유일한 프로그래머로 게임의 모든 코드를 작성하고, TOEI 퍼블리싱 계약 이후 최적화·배포·QA까지 출시 과정을 맡았습니다. 국내외 수상·선정 13건.
+summary: 한국형 미스터리 비주얼노벨 어드벤처. 팀의 유일한 프로그래머로 게임의 모든 코드를 작성하고, TOEI 퍼블리싱 계약 이후
+  최적화·배포·QA까지 출시 과정을 맡았습니다. 국내외 수상·선정 13건.
 tldr:
   - 팀의 유일한 프로그래머로 게임의 모든 코드를 작성 — 시스템 설계부터 빌드·출시 대응까지
   - TOEI GAMES 퍼블리싱 · 수상·선정 13건 · 5개국 전시 30회 이상
@@ -75,19 +76,13 @@ Unity 6 (URP) · C# · PixelCrushers Dialogue System / Save System (Lua 변수) 
 - Spine 애니메이션과 Cinemachine 카메라 연출로 스테이지를 구성하고, 플레이어가 NPC와 직접 상호작용한다고 느끼도록 콘텐츠별 연출 설계
 - 전시에서 반응이 밋밋한 구간을 찾아 애니메이션과 셰이더를 추가해 긴장감과 깊이감을 보강 — 이후 전시에서 "화면이 풍부해졌다"는 평가
 
-<img src="/images/killa-symbol-fx.webp" alt="KILLA 기호 조합 장면 연출" loading="lazy" decoding="async" />
+![KILLA 기호 조합 장면 연출](/images/killa-symbol-fx.webp)
 
-*기호 조합 장면 — Spine 애니메이션과 셰이더·포스트 프로세싱 연출*
+![KILLA 추리 장면 연출](/images/killa-stage-fx.webp)
 
-<img src="/images/killa-stage-fx.webp" alt="KILLA 추리 장면 연출" loading="lazy" decoding="async" />
+![KILLA 증거 선택 UI 연출](/images/killa-evidence-ui-v2.webp)
 
-*추리 장면 — Spine 애니메이션과 셰이더·포스트 프로세싱 연출*
-
-<img src="/images/killa-evidence-ui-v2.webp" alt="KILLA 증거 선택 UI 연출" loading="lazy" decoding="async" />
-
-*증거 선택 UI — 필름 스트립 위로 증거를 배치하는 연출*
-
-*(Unity 에디터 캡처)*
+*(현재 공개 가능 자료 - Unity 에디터 캡처)*
 
 ## 3. 최적화
 
@@ -310,6 +305,7 @@ public class BuildConfig : ScriptableObject
 ## 전시 이력 — 30회 이상 · 5개국
 
 **해외**
+
 - 도쿄게임쇼 2024 **Selected Indie 80** (일본)
 - 도쿄게임쇼 2025 · 2026 (일본) — 2026년은 TOEI GAMES 부스
 - **gamescom 2024** Indie Arena Booth (독일)
@@ -319,6 +315,7 @@ public class BuildConfig : ScriptableObject
 - LA COMIC-CON (미국), ANIMAGIC (독일)
 
 **국내**
+
 - G-STAR 2023 · 2024 인디 쇼케이스
 - BIC 2023 · 2026 (부산인디커넥트 페스티벌)
 - 버닝비버 2023 · 2024 — 2년 연속 '올해의 버닝비버'
