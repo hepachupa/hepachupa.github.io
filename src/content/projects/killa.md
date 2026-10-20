@@ -105,6 +105,139 @@ Unity 6 (URP) · C# · PixelCrushers Dialogue System / Save System (Lua 변수) 
 
 **결과** — 반복적인 감사·리팩터링 작업은 AI에 맡기고, 저는 구조 설계와 최종 검증에 시간을 쓸 수 있었습니다.
 
+## 핵심 코드 발췌
+
+퍼블리싱 중인 상용 프로젝트라 구조가 드러나는 부분만 일부 발췌했습니다. 스포일러가 될 수 있는 변수명과 씬 이름, 인스펙터 툴팁과 일부 필드·예외 처리는 빼고 줄였습니다.
+
+### 1. 스토리 단계를 데이터로 관리 — `StoryLayerController`
+
+씬마다 조건문을 흩어 두는 대신, 스토리 단계 이름과 **같은 이름의 오브젝트 묶음만 켜는** 방식으로 분기를 단순하게 만들었습니다. 시나리오가 늘어도 씬에 레이어 오브젝트만 추가하면 되고, 코드는 그대로입니다.
+
+**개선 이력:** 처음에는 "세이브 복원이 끝났겠지" 하고 **3프레임을 기다린 뒤** 적용했습니다. 복원이 늦어지는 씬에서는 잘못된 레이어가 켜질 수 있는 구조였습니다. 지금은 세이브 시스템의 **복원 완료 이벤트(`saveDataApplied`)에 맞춰 적용**하고, 세이브를 거치지 않는 로드에만 폴백으로 대기하도록 바꿨습니다. 같은 프로젝트의 스폰 처리와 같은 패턴으로 맞췄고, 단계 이름에 맞는 레이어가 없으면 경고를 띄워 데이터 오타를 바로 잡을 수 있게 했습니다. 직렬화 필드와 공개 메서드는 그대로 둬서 기존 씬과 호출부는 수정할 필요가 없습니다.
+
+```csharp
+public class StoryLayerController : MonoBehaviour
+{
+    public Transform storyLayersRoot;
+    public bool applyOnStart = true;
+    [Min(0)] public int fallbackFrameTimeout = 3; // 세이브를 거치지 않는 로드 대비
+
+    private readonly List<GameObject> _layers = new List<GameObject>();
+    private readonly HashSet<string> _layerNames = new HashSet<string>(StringComparer.Ordinal);
+    private bool _appliedOnce;
+
+    private void Awake()     => BuildCache();
+    private void OnEnable()  => SaveSystem.saveDataApplied += HandleSaveDataApplied;
+    private void OnDisable() => SaveSystem.saveDataApplied -= HandleSaveDataApplied;
+
+    // 모든 Saver(위치 등) 복원이 끝난 직후 호출됨 → 프레임 수 추측 없이 정확한 시점에 적용
+    private void HandleSaveDataApplied()
+    {
+        if (applyOnStart) ApplyFromLua();
+    }
+
+    // 폴백: 복원 이벤트가 오지 않는 일반 씬 로드
+    private IEnumerator Start()
+    {
+        if (!applyOnStart) yield break;
+        while (DialogueManager.instance == null) yield return null;
+        for (int f = 0; f < fallbackFrameTimeout && !_appliedOnce; f++) yield return null;
+        if (!_appliedOnce) ApplyFromLua();
+    }
+
+    public void ApplyFromLua()
+    {
+        if (storyLayersRoot == null) return;
+        string step = DialogueLua.GetVariable(StoryVars.StoryStep).asString;
+
+        if (!string.IsNullOrEmpty(step) && !_layerNames.Contains(step))
+            Debug.LogWarning($"STORYSTEP '{step}' 에 맞는 레이어가 없습니다.", this); // 데이터 오타 조기 발견
+
+        foreach (var go in _layers)
+            go.SetActive(go.name == step); // 현재 단계와 이름이 같은 레이어만 활성화
+
+        _appliedOnce = true;
+    }
+}
+```
+
+### 2. 조건부 씬 이동 — `PortalStoryRouter`
+
+같은 문이라도 스토리 단계, 퀘스트 상태, 변수에 따라 다른 곳으로 보내야 했습니다. **조건이 있는 경로는 배열 순서대로 우선 검사**하고, 하나도 맞지 않으면 **조건 없는 기본 경로**로 보내도록 해서, 기획자가 인스펙터에서 경로를 추가하는 것만으로 분기를 만들 수 있게 했습니다.
+
+```csharp
+public bool TryResolve(out string scene, out string storyStep, out string spawnId)
+{
+    scene = storyStep = spawnId = "";
+    string current = StoryFlow.GetStoryStep();
+    if (string.IsNullOrEmpty(current) || routes == null) return false;
+
+    Route fallback = null;
+    foreach (var r in routes)
+    {
+        if (r == null || !string.Equals(r.fromStoryStep, current, StringComparison.Ordinal))
+            continue;
+
+        if (!r.HasCondition)
+        {
+            // 조건 없는 경로는 기본 분기로 보관 (가장 먼저 만난 것 우선)
+            if (fallback == null) fallback = r;
+            continue;
+        }
+
+        // 조건부 경로: 만족하면 즉시 채택 (배열 순서 = 우선순위)
+        if (ConditionMet(r)) { Assign(r, out scene, out storyStep, out spawnId); return true; }
+    }
+
+    if (fallback != null) { Assign(fallback, out scene, out storyStep, out spawnId); return true; }
+    return false; // 매칭 없음 → 호출부의 기본 이동 처리에 위임
+}
+
+private static bool ConditionMet(Route r)
+{
+    bool varOk   = string.IsNullOrEmpty(r.requiredBoolVariable)
+                   || DialogueLua.GetVariable(r.requiredBoolVariable).asBool;
+    bool questOk = string.IsNullOrEmpty(r.requiredQuest)
+                   || MatchesQuestState(QuestLog.GetQuestState(r.requiredQuest), r.requiredQuestState);
+    bool luaOk   = string.IsNullOrWhiteSpace(r.requiredLuaCondition)
+                   || Lua.IsTrue(r.requiredLuaCondition);
+    return varOk && questOk && luaOk;
+}
+```
+
+### 3. 어디서든 시작하는 빌드 — `BuildConfig.StartPoint`
+
+전시·QA 빌드를 코드 수정 없이 만들기 위해, "어디서부터 시작할지"를 **씬 + 스토리 단계 + 스폰 위치 + 날짜 + 초기 Lua**의 데이터 묶음으로 정의했습니다. ScriptableObject 하나로 Normal / GameShow / QA 모드를 전환합니다.
+
+```csharp
+[CreateAssetMenu(fileName = "BuildConfig", menuName = "Game/Build Config")]
+public class BuildConfig : ScriptableObject
+{
+    public enum BuildMode { Normal = 0, GameShow = 1, QA = 2 }
+
+    [Serializable]
+    public class StartPoint
+    {
+        public string sceneName;   // 로드할 씬
+        public string storyStep;   // 활성화할 스토리 레이어 이름
+        public string spawnId;     // 스폰 포인트 이름
+        public bool overrideDay = true;
+        [Min(0)] public int day = 0;
+        [TextArea(2, 8)] public string seedLua; // 퀘스트·플래그·아이템 초기 상태
+
+        public bool IsValid => !string.IsNullOrEmpty(sceneName);
+    }
+
+    [SerializeField] private BuildMode mode = BuildMode.Normal;
+    [SerializeField] private StartPoint gameShowStart = new StartPoint();
+    [SerializeField, Range(30f, 600f)] private float idleTimeoutSeconds = 300f; // 전시장 무입력 시 복귀
+
+    public bool IsGameShowMode => mode == BuildMode.GameShow;
+    public bool IsQAMode => mode == BuildMode.QA;
+    public StartPoint GameShowStart => gameShowStart;
+}
+```
+
 ## 게임 시스템
 
 - **분기 서사 구조** — 스토리 진행 단계를 `StoryLayer`로 정의하고 `StoryLayerController`가 레이어별 오브젝트 세트를 전환. `PortalStoryRouter` / `PortalRequirementRouter`로 조건부 씬 이동
