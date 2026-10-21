@@ -1,5 +1,5 @@
 ---
-title: Agent.I — LLM 사이비 마을 게임
+title: Agent.I
 summary: Generative Agents를 적용한 Human-like NPC 14명이 스스로 생각하고 움직이는 마을에서, AI가 결정한
   NPC의 행동이 게임의 승패를 가르는 사회 시뮬레이션 게임.
 start: 2023-09-01
