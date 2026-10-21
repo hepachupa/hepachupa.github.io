@@ -76,7 +76,7 @@ const facts: [string, string | undefined][] = [
           <li>
             <a href={`#item/${r.uid}`} data-open={r.uid}>
               <span class:list={['dot', `k-${r.kind}`]}></span>
-              <span class="when">{r.when}</span>
+              {r.when && <span class="when">{r.when}</span>}
               <span class="t">{r.title}</span>
               {r.result && <span class="r">{r.result}</span>}
             </a>
