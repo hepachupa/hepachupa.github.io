@@ -1,7 +1,7 @@
 ---
 title: 브릿지 (게임개발연합동아리)
 summary: 대학생 연합 게임 제작동아리. KILLA를 처음 시작한 곳이며, 팀 '마세구(MSG)'를 결성해 모바일 탄막 슈팅 '마법소녀, 도와줘!'도 개발.
-start: 2023-03-01
+start: 2022-02-01
 end: ""
 hide_dates: true
 organization: 브릿지 — 게임개발연합동아리
