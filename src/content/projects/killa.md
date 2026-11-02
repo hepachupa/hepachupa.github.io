@@ -29,6 +29,7 @@ highlights:
   - Claude와 원인을 분석하고 A/B 측정으로 검증해 시작 시 멈춤 제거 — 노이즈 생성 352ms → 0ms
   - Claude와 빌드 리포트를 분석해 압축되지 않던 이미지 1,645장을 자동 변환 — 설치 용량 6.4GB → 4.7GB(−27%)
   - 기획·사운드 작업이 코드 수정 없이 반영되도록 툴 제작 — 인스펙터 기반 씬 분기, 대사별 효과음 자동 재생
+  - 물리·충돌 기반 퍼즐 기믹 설계 — 두 세계 전환(충돌 매트릭스·렌더링·레이캐스트 동기화), 중력 반전 이동, 상태머신 기반 퍼즐 판정
   - 도쿄게임쇼·gamescom·BitSummit·Unite Seoul 등 5개국 전시 30회 이상, Steam 데모 5개 언어 지원
 links:
   - label: Steam
@@ -261,6 +262,14 @@ private static bool ConditionMet(Route r)
 
 *왼쪽부터 원본 · 압축 결과 · 차이를 8배 확대한 이미지 — 차이가 거의 보이지 않음*
 
+### 3-4. Addressables 도입 검토 — 측정 후 보류
+
+**질문** — 전역 매니저가 리소스를 게임 내내 붙잡고 있는 구조라, 필요할 때만 불러오는 Addressables로 바꾸면 얼마나 이득인지 먼저 확인했습니다. (프로젝트에는 이미 다국어 현지화용으로 Addressables 기반 Localization 테이블 5개 언어가 구성되어 있습니다.)
+
+**조사** — 상시 로드되는 인벤토리 아이템 이미지 68장과 게임오버 일러스트 16장을 실제 해상도와 압축 형식으로 계산해 **약 15MB**임을 확인했습니다. 함께, 전환하면 같은 이미지가 빌드와 번들에 **이중으로 포함될 직접 참조 3건**(프리팹에 남은 플레이스홀더, 다른 데이터 에셋의 공유 스프라이트)을 찾았습니다.
+
+**판단** — PC 기준으로 체감되지 않는 이득에 비해, 출시를 앞두고 빌드 파이프라인(Normal / GameShow / QA)과 게임오버·씬 전환 흐름의 로드·해제 시점을 다시 검증해야 하는 위험이 크다고 보고 **도입을 보류**했습니다. 출시 후 콘텐츠 추가·패치가 필요해지는 시점에 이 조사 결과를 바탕으로 다시 검토합니다.
+
 ## 4. 배포 · 빌드 파이프라인
 
 **문제** — 전시용, QA용, 출시용 빌드마다 시작 지점과 설정이 달라 매번 수동으로 변경해야 했고, 작은 실수가 빌드 사고로 이어졌습니다.
@@ -335,6 +344,169 @@ public class BuildConfig : ScriptableObject
 
 **결과** — 효과음 추가·교체가 대화 데이터 수정만으로 끝나, 사운드 작업이 코드나 씬 수정 없이 게임에 즉시 반영됩니다.
 
+## 7. 퍼즐 · 기믹 설계
+
+장면마다 조작 방식이 다른 퍼즐과 기믹을 여러 종 만들었습니다. 스포일러를 피하기 위해 장면과 인물은 밝히지 않고, 구조 위주로 정리했습니다.
+
+### 7-1. 두 세계 전환 기믹 — 충돌 · 렌더링 · 레이캐스트 동기화
+
+**문제** — 같은 공간에 겹쳐 있는 두 버전의 세계(기본 / 숨겨진 세계)를 플레이어가 버튼 하나로 오가야 했습니다. 화면에서만 바꾸면 보이지 않는 세계의 벽에 부딪히거나, 보이지 않는 바닥을 밟고 서 있는 문제가 생깁니다.
+
+**해결** — 전환 한 번에 렌더링, 물리, 레이캐스트를 함께 바꾸는 `VisionWorldSwitcher`를 만들었습니다.
+
+- **렌더링** — 카메라 컬링 마스크에서 숨은 세계 레이어만 제외. 컷신 카메라 등 추가 카메라와, 카메라가 교체될 때(`RebindCamera`)도 같은 상태를 다시 적용
+- **물리** — 플레이어와 숨은 세계 레이어의 충돌을 끄고, 바꾸기 전 원래 충돌 설정을 저장해 두었다가 씬을 나갈 때 복원 (다른 씬의 충돌 매트릭스를 오염시키지 않음)
+- **CharacterController 대응** — 충돌 매트릭스 변경만으로는 이동 중 충돌이 끊기지 않는 경우가 있어, 숨은 세계의 콜라이더를 직접 비활성화하는 처리를 함께 적용
+- **레이캐스트** — 상호작용·지면 검사가 숨은 세계를 맞히지 않도록 현재 세계 기준 마스크(`ActiveRaycastMask`)를 공개하고, 전환 전후로 발밑 지면을 SphereCast로 검사해 로그를 남김
+- NavMesh·FMOD처럼 기능 때문에 레이어를 바꿀 수 없는 오브젝트, 라이트·볼륨은 따로 수집해 함께 전환
+
+<details class="code-fold">
+<summary>코드 보기 — VisionWorldSwitcher.Apply (발췌)</summary>
+
+```csharp
+private void Apply(bool on)
+{
+    IsVisionOn = on;
+    int showMask = on ? visionWorldLayers.value : normalWorldLayers.value;
+    int hideMask = on ? normalWorldLayers.value : visionWorldLayers.value;
+
+    // 1) 렌더링: 숨은 세계 레이어만 컬링 마스크에서 제외
+    ApplyCameraMask(targetCamera, showMask, hideMask);
+
+    // 2) 물리: 플레이어는 보이는 세계와만 충돌 (원래 값은 스냅샷 후 변경)
+    SetIgnoreBetweenMasks(playerLayers.value, showMask, false);
+    SetIgnoreBetweenMasks(playerLayers.value, hideMask, true);
+
+    // 2-1) CharacterController 대응: 숨은 세계 콜라이더를 직접 비활성화
+    SetAllColliderEnabled(normalWorldColliders, !on);
+    SetAllColliderEnabled(visionWorldColliders, on);
+
+    // 3) 레이캐스트: 숨은 세계만 제외한 마스크를 공개
+    ActiveRaycastMask = ~hideMask;
+
+    OnVisionChanged?.Invoke(on);
+}
+
+private void SetIgnoreBetweenMasks(int maskA, int maskB, bool ignore)
+{
+    for (int a = 0; a < 32; a++)
+    {
+        if ((maskA & (1 << a)) == 0) continue;
+        for (int b = 0; b < 32; b++)
+        {
+            if ((maskB & (1 << b)) == 0) continue;
+            int lo = Mathf.Min(a, b), hi = Mathf.Max(a, b);
+            int key = (lo << 8) | hi;
+            if (!savedIgnorePairs.ContainsKey(key)) // 최초 변경 시에만 원본 저장 → OnDestroy에서 복원
+                savedIgnorePairs.Add(key, Physics.GetIgnoreLayerCollision(lo, hi));
+            Physics.IgnoreLayerCollision(lo, hi, ignore);
+        }
+    }
+}
+```
+
+</details>
+
+<!-- GIF 자리: 두 세계 전환 장면 (5~10초, 스포일러 없는 구간) -->
+
+### 7-2. 중력 반전 이동 — 천장 걷기
+
+**문제** — 특정 구역에 들어가면 천장을 바닥처럼 걷는 기믹이 필요했습니다. 캐릭터 루트를 뒤집으면 CharacterController와 NavMesh 이동이 함께 깨집니다.
+
+**해결**
+
+- 이동 루트는 그대로 두고 **시각용 자식(그래픽)만 상하 반전**해, 충돌과 내비게이션에 영향이 없게 분리
+- 반전 구역에서는 중력 방향을 뒤집고, 위쪽으로 레이캐스트해 가장 가까운 천장 높이에 캐릭터를 붙이는 **천장 스냅** 적용
+- 발사 구역(`LaunchZone`)은 위로 쏘아 올린 직후 0.2초 동안 접지 보정을 건너뛰는 유예 시간을 두어, 바닥에 붙은 상태로 발사가 취소되지 않게 처리. 같은 진입에서 연속 발사되지 않도록 쿨다운 적용
+- 카메라를 180° 회전시켜 천장이 바닥처럼 보이게 하고, 좌우 입력도 화면 기준으로 맞게 반전
+- 문 이동 연출 중에는 구역 이탈 처리를 막아, 연출과 중력 상태가 엇갈리지 않게 함
+
+<details class="code-fold">
+<summary>코드 보기 — 천장 스냅 (발췌)</summary>
+
+```csharp
+private void SnapUnderCeiling()
+{
+    float topOffset = controller.center.y + controller.height * 0.5f;
+    Vector3 origin = transform.position + Vector3.up * Mathf.Max(0.01f, topOffset - 0.02f);
+
+    RaycastHit[] hits = Physics.RaycastAll(origin, Vector3.up, ceilingSnapMaxDistance,
+                                           ~0, QueryTriggerInteraction.Ignore);
+    float bestDist = float.MaxValue, bestY = 0f;
+    bool found = false;
+    foreach (var h in hits)
+    {
+        if (h.collider.transform.IsChildOf(transform)) continue; // 자기 자신 제외
+        if (h.distance < bestDist) { bestDist = h.distance; bestY = h.point.y; found = true; }
+    }
+    if (!found) return;
+
+    // 천장 바로 아래에 머리가 닿도록 위치 고정
+    float targetPivotY = bestY - topOffset - ceilingSnapOffset;
+    if (transform.position.y >= targetPivotY - ceilingSnapEngage)
+    {
+        var p = transform.position; p.y = targetPivotY; transform.position = p;
+        ySpeed = 0f;
+    }
+}
+```
+
+</details>
+
+<!-- GIF 자리: 발사 → 천장 착지 → 천장 걷기 (5~10초) -->
+
+### 7-3. 퍼즐 판정을 상태머신으로 — 정답 누락 · 중복 발생 수정
+
+**문제** — 같은 색의 점을 선으로 이어 모든 칸을 채우는 경로 퍼즐에서, 처음에는 **끝점에서 손을 뗀 순간에만** 정답을 검사했습니다. 마지막 연결을 끝점이 아닌 곳에서 마무리하면 정답이 잡히지 않았고, 정답 상태를 기억하지 않아 성공 이벤트가 여러 번 발생할 수 있었습니다.
+
+**해결** — 보드가 바뀔 때마다 판정하되, `Playing → Resolving → Solved` 상태머신으로 결과를 한 번만 처리하도록 바꿨습니다.
+
+- 정답이면 즉시 보드를 잠그고, 마지막 선이 그려지는 연출 시간을 둔 뒤 성공 이벤트를 **1회만** 발생
+- 모든 쌍을 이었지만 빈칸이 남으면 오답 처리 후 자동 초기화. 단, **선을 그리는 도중에는 오답 판정을 하지 않음** — 마지막 쌍을 잇는 순간 손가락 밑에서 보드가 리셋되면 조작감이 망가지기 때문
+- 연출 중 `timeScale`이 0이 될 수 있어 대기는 `WaitForSecondsRealtime` 기준, 코루틴은 핸들로 개별 관리
+
+<details class="code-fold">
+<summary>코드 보기 — 퍼즐 판정 (발췌)</summary>
+
+```csharp
+public enum PuzzleState { Playing, Resolving, Solved }
+
+void OnBoardChanged()
+{
+    // Solved: 정답 1회 보장. Resolving: 리셋 대기 중에는 재판정하지 않음
+    if (_state != PuzzleState.Playing) return;
+    Evaluate();
+}
+
+public void Evaluate()
+{
+    if (_state != PuzzleState.Playing || board == null || !board.IsValid) return;
+
+    foreach (var color in board.ColorOrder)
+        if (!board.IsColorConnected(color)) return; // 아직 진행 중
+
+    if (requireAllCellsFilled && !board.AreAllCellsFilled())
+    {
+        if (board.IsDrawing) return; // 그리는 도중엔 오답 판정 보류 → 손을 떼면 다시 판정
+        HandleWrongAttempt();        // Resolving → 연출 후 자동 초기화
+        return;
+    }
+    Solve();                         // Solved → 보드 잠금 → 딜레이 후 성공 이벤트 1회
+}
+```
+
+</details>
+
+### 7-4. 드래그 앤 드롭 퍼즐 공통 구조
+
+아이템을 끌어 대상 위치에 사용하는 퍼즐 여러 종을 같은 구조로 만들었습니다.
+
+- 아이템마다 `Ready → Dragging → Resolving → Used` 상태를 두어, 판정 연출 중 입력과 재사용을 차단
+- **static 싱글톤 대신 매니저를 주입** — 한 씬에 같은 퍼즐 세트가 여러 벌 있어도 서로의 상태를 건드리지 않음
+- 부모의 `OnEnable`이 자식의 `Awake`보다 먼저 호출되는 경우를 대비해 지연 초기화
+- `StopAllCoroutines()`가 관련 없는 코루틴까지 멈추는 문제를 피하려고 코루틴 핸들을 직접 관리
+- 레이아웃 그룹의 직계 자식을 드래그하면 나머지가 재정렬되며 위치가 튀는 문제를, 중간에 슬롯 오브젝트를 두는 계층 구조로 해결
+
 <details class="code-fold">
 <summary>코드 보기 — DialogueFmodLocalPlayer.OnLine</summary>
 
@@ -371,7 +543,7 @@ private void OnLine(Subtitle subtitle)
 - **분기 서사 구조** — 스토리 진행 단계를 `StoryLayer`로 정의하고 `StoryLayerController`가 레이어별 오브젝트 세트를 전환. `PortalStoryRouter` / `PortalRequirementRouter`로 조건부 씬 이동
 - **인벤토리** — 아이템을 ScriptableObject로 정의하고 id 기반으로 관리. 아이템마다 사용 가능한 씬·스토리 단계를 데이터로 지정해, 대화 중 인벤토리를 열어 아이템을 제출하면 그 결과가 대화 변수로 돌아가 분기에 쓰이도록 연결(`InventoryDialogueBridge`). 세이브 시스템 연동, 대화 데이터에서 소지 여부를 바로 확인하는 Lua 조건 함수, 수량 변경 이벤트로 퀘스트 조건·알림 UI와 연결
 - **호감도** — NPC별 호감도를 대화 시스템 전역 변수로 저장해 세이브·로드와 대화 분기에서 그대로 사용. 하루 행동력 안에서 대화할 NPC를 고르는 구조로, 남은 행동력을 따로 저장하지 않고 "오늘 대화한 NPC 수"로 매번 계산해 세이브 로드 후에도 상태가 어긋나지 않게 설계
-- **추리 콘텐츠** — 장면마다 조작 방식이 다른 추리·퍼즐 미니게임 여러 종 구현 (스포일러 방지를 위해 세부 내용은 생략)
+- **추리 콘텐츠** — 장면마다 조작 방식이 다른 추리·퍼즐 미니게임 여러 종 구현 (구조는 7번 참고, 스포일러 방지를 위해 장면 내용은 생략)
 - **카메라** — Cinemachine Global/Local 카메라 매니저로 컷신 ↔ 플레이 전환, 그룹 대화용 마스터/투샷/클로즈업 연출, Impulse 카메라 셰이크
 - **게임오버** — 콘텐츠별 목숨을 Lua 변수로 관리, 게임오버마다 자동 저장
 - **UI** — 아이템/퀘스트 분리 알림 큐, `QuestCatalog` ScriptableObject, 로컬라이제이션 연동 `ConfirmDialog`, Spine 말하기 애니메이션 홀드
