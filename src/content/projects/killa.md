@@ -331,6 +331,95 @@ public class BuildConfig : ScriptableObject
 
 **결과** — QA가 "처음부터 다시 플레이"가 아니라 "원하는 지점에서 바로 확인"하는 방식으로 바뀌었습니다.
 
+### 5-1. 엔딩 분기 QA 툴 — 에디터 창 + 빌드용 오버레이
+
+**문제** — KILLA는 플레이어의 선택과 호감도에 따라 여러 엔딩으로 갈라집니다. 엔딩 하나를 확인하려면 해당 분기 지점까지 직접 플레이하며 조건 변수를 맞춰야 했고, 엔딩 판정 규칙을 고칠 때마다 모든 경로를 다시 확인해야 했습니다. 판정이 기대와 다르게 나와도 **어떤 조건 때문에 그 엔딩이 됐는지** 보이지 않았습니다.
+
+**해결** — 엔딩 판정과 QA 도구를 함께 설계했습니다.
+
+- **판정을 데이터로** — 엔딩 판정을 순서가 곧 우선순위인 Lua 조건 규칙 목록(`EndingRuleSet`, ScriptableObject)으로 만들고, 모든 엔딩 확정 지점이 하나의 진입점(`EndingResolver`)을 거치게 했습니다. 결과는 대화 시스템 변수에만 저장해 세이브를 불러와도 이전 판정이 남지 않습니다. 에디터에서는 조건이 비었거나 엔딩 ID가 중복된 규칙을 저장 시점에 경고합니다.
+- **경로 프리셋** — 엔딩 경로마다 "어느 씬·스토리 단계·스폰 위치로 보내고, 어떤 변수를 세팅할지 + 기대 엔딩 + 도착 후 할 일"을 프리셋(ScriptableObject)으로 정의했습니다. 버튼 한 번에 엔딩 변수를 초기화하고 해당 지점으로 이동합니다.
+- **판정 미리보기** — 현재 변수로 모든 규칙을 평가해 규칙별 참/거짓과 "위에서부터 처음 참인 규칙"을 보여줍니다. 판정이 기대와 다를 때 원인 조건을 바로 찾을 수 있습니다.
+- **강제 연출 · 실시간 변수 · Lua 실행** — 판정과 무관하게 특정 엔딩 연출만 재생, 감시할 변수를 실시간 표시, Lua를 직접 실행해 상태를 만드는 기능을 넣었습니다.
+- **에디터와 빌드 모두에서** — 개발 중에는 에디터 창(`KILLA > Ending QA`)으로, QA 빌드에서는 같은 기능을 F9로 여는 IMGUI 오버레이로 씁니다. 오버레이는 `DEBUG_QA` 심볼이 있을 때만 컴파일되어 출시 빌드에는 기능이 포함되지 않습니다.
+
+**결과** — 엔딩 확인이 "분기 지점까지 처음부터 플레이"에서 "프리셋 선택 → 이동 → 판정 확인"으로 바뀌었고, 판정 규칙을 고친 뒤에도 모든 엔딩 경로를 같은 순서로 반복 확인할 수 있게 되었습니다.
+
+<details class="code-fold">
+<summary>코드 보기 — EndingRuleSet (판정 · 판정 미리보기)</summary>
+
+```csharp
+/// 위에서부터 평가해서 처음으로 참인 규칙의 엔딩을 반환한다. 순서 = 우선순위.
+[CreateAssetMenu(menuName = "KILLA/Ending/Ending Rule Set")]
+public class EndingRuleSet : ScriptableObject
+{
+    [Serializable]
+    public class Rule
+    {
+        public string note;                       // 기획 메모
+        [TextArea(1, 3)] public string luaCondition;
+        public EndingDefinition ending;
+    }
+
+    [SerializeField] private List<Rule> rules = new List<Rule>();
+
+    public EndingDefinition Evaluate(out int ruleIndex)
+    {
+        for (int i = 0; i < rules.Count; i++)
+        {
+            var rule = rules[i];
+            if (rule == null || rule.ending == null) continue;
+            if (string.IsNullOrWhiteSpace(rule.luaCondition))
+            {
+                Debug.LogError($"규칙 #{i} ({rule.note}) 조건이 비어 있음. 건너뜀", this);
+                continue;
+            }
+            if (Lua.IsTrue(rule.luaCondition)) { ruleIndex = i; return rule.ending; }
+        }
+        ruleIndex = -1;
+        return null; // fallback 없음 → Resolver가 에러 로그
+    }
+
+    /// QA용: 규칙별 현재 평가 결과
+    public string DumpEvaluation()
+    {
+        var sb = new System.Text.StringBuilder();
+        for (int i = 0; i < rules.Count; i++)
+        {
+            var r = rules[i];
+            bool ok = !string.IsNullOrWhiteSpace(r.luaCondition) && Lua.IsTrue(r.luaCondition);
+            sb.AppendLine($"#{i:00} [{(ok ? "O" : " ")}] {r.ending?.Id,-10} {r.note}");
+        }
+        return sb.ToString();
+    }
+}
+```
+
+</details>
+
+<details class="code-fold">
+<summary>코드 보기 — 프리셋으로 엔딩 경로 이동 (EndingQAOverlay 발췌)</summary>
+
+```csharp
+#if UNITY_EDITOR || DEBUG_QA   // 출시 빌드에는 포함되지 않음
+private void Jump(EndingQAPresets.Preset p)
+{
+    // 1) 이전 판정 지우고 엔딩 변수 초기화 → 프리셋 변수 적용
+    EndingResolver.Instance?.ClearResult();
+    RunLua(presets.resetLua);
+    RunLua(p.luaSetup);
+
+    // 2) 씬 활성화 직전에 스토리 단계·스폰 지정 (BuildConfig.StartPoint와 같은 진입 방식)
+    string step = p.storyStep, spawn = p.spawnId ?? "";
+    Debug.Log($"[EndingQA] '{p.title}' → {p.sceneName} / {step} @{spawn}  (기대 {p.expectedEndingId})");
+    SceneController.LoadScene(p.sceneName, beforeActivate: () => StoryFlow.SetStory(step, spawn));
+}
+#endif
+```
+
+</details>
+
+
 ## 6. 협업 툴: 대사별 FMOD 효과음 자동 재생
 
 **문제** — 대사에 맞춰 효과음을 넣으려면 씬에 이벤트를 따로 배치하거나, 대사 노드마다 이벤트를 일일이 입력해야 했습니다. 효과음을 추가하거나 교체할 때마다 씬 수정과 반복 입력 작업이 필요했습니다.
