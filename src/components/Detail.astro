@@ -7,7 +7,26 @@ interface Props { item: any; related?: Ref; backrefs?: Ref[] }
 const { item, related, backrefs = [] } = Astro.props;
 const d = item.data;
 const kind: Kind = item.kind;
-const { Content } = await render(item);
+const { Content, headings } = await render(item);
+
+// 목차: 본문의 큰 제목(##)·작은 제목(###) — "3-2. 제목 — 결과" 형식에서 번호·결과를 분리
+const toc = headings.filter((h) => h.depth === 2 || h.depth === 3).map((h) => {
+  let title = h.text;
+  const m = title.match(/^(\d+(?:-\d+)*)\.\s+/);
+  const num = m ? m[1] : '';
+  if (m) title = title.slice(m[0].length);
+  const i = title.indexOf(' — ');
+  const badge = i >= 0 ? title.slice(i + 3) : '';
+  if (i >= 0) title = title.slice(0, i);
+  const code = /^코드:\s*/.test(title);
+  if (code) title = title.replace(/^코드:\s*/, '');
+  return { ...h, num, title, badge: code ? '' : badge, code };
+});
+const hasToc = kind === 'project' && toc.length >= 6;
+const metrics = (d.metrics ?? []).map((m: any) => {
+  const h = m.target ? toc.find((t) => t.num === m.target) ?? toc.find((t) => t.text.startsWith(m.target)) : undefined;
+  return { ...m, slug: h?.slug, to: h ? (h.num ? `${h.num} ${h.title}` : h.title) : '' };
+});
 const facts: [string, string | undefined][] = [
   ['기간', d.hide_dates ? undefined : period(d)],
   ['역할', d.role],
@@ -18,7 +37,24 @@ const facts: [string, string | undefined][] = [
   ['소속', d.organization],
 ];
 ---
-<article class="detail" id={`detail-${item.uid}`} data-uid={item.uid}>
+<article class:list={['detail', { 'has-toc': hasToc }]} id={`detail-${item.uid}`} data-uid={item.uid} data-title={d.title}>
+<div class:list={['detail-layout', { on: hasToc }]}>
+  {hasToc && (
+    <nav class="toc" aria-label="목차">
+      <p class="toc-title">목차</p>
+      <ol>
+        {toc.map((t) => (
+          <li class:list={[`d${t.depth}`, { code: t.code }]}>
+            <button type="button" data-toc={t.slug}>
+              {t.num && <span class="toc-num">{t.num}</span>}
+              <span class="toc-t">{t.title}{t.badge && <span class="toc-badge">{t.badge}</span>}</span>
+            </button>
+          </li>
+        ))}
+      </ol>
+    </nav>
+  )}
+<div class="detail-main">
   <header>
     <span class:list={['kind-pill', `k-${kind}`]}>{KIND_LABEL[kind]}</span>
     <h2>{d.title}</h2>
@@ -27,6 +63,18 @@ const facts: [string, string | undefined][] = [
       <ul class="tldr">{d.tldr.map((t: string) => <li>{t}</li>)}</ul>
     )}
   </header>
+
+  {metrics.length > 0 && (
+    <div class="metrics">
+      {metrics.map((m: any) => (
+        <button type="button" data-toc={m.slug} disabled={!m.slug}>
+          <strong>{m.value}</strong>
+          <span class="m-label">{m.label}</span>
+          {m.to && <span class="m-to">{m.to} →</span>}
+        </button>
+      ))}
+    </div>
+  )}
 
   {d.video ? (
     <Video url={d.video} />
@@ -42,12 +90,17 @@ const facts: [string, string | undefined][] = [
     {facts.filter(([, v]) => v).map(([k, v]) => (<div><dt>{k}</dt><dd>{v}</dd></div>))}
   </dl>
 
-  {d.highlights.length > 0 && (
+  {d.highlights.length > 0 && (metrics.length > 0 ? (
+    <details class="highlights fold">
+      <summary>핵심 성과 전체 보기 <span>{d.highlights.length}</span></summary>
+      <ul>{d.highlights.map((h: string) => <li>{h}</li>)}</ul>
+    </details>
+  ) : (
     <section class="highlights">
       <h4>핵심 성과</h4>
       <ul>{d.highlights.map((h: string) => <li>{h}</li>)}</ul>
     </section>
-  )}
+  ))}
 
   <div class="prose"><Content /></div>
 
@@ -94,4 +147,6 @@ const facts: [string, string | undefined][] = [
       )}
     </footer>
   )}
+</div>
+</div>
 </article>

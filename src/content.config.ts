@@ -28,6 +28,8 @@ const item = z.object({
   team: optStr,
   contribution: optStr,
   highlights: z.array(z.string()).optional().nullable().transform((v) => v ?? []),
+  // 상세 맨 위 숫자 카드 (target: 이동할 제목 번호 '3-2' 또는 제목 앞부분)
+  metrics: z.array(z.object({ value: z.string(), label: z.string(), target: optStr })).optional().nullable().transform((v) => v ?? []),
   video: optStr,
   videos: z.array(z.string()).optional().nullable().transform((v) => (v ?? []).filter(Boolean)), // 추가 영상
   gallery: z.array(z.string()).optional().nullable().transform((v) => v ?? []),

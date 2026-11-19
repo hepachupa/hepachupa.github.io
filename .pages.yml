@@ -53,6 +53,14 @@ content:
       - { name: video, label: 영상 (유튜브 링크 또는 mp4 경로), type: string }
       - { name: videos, label: 추가 영상 (유튜브·구글 드라이브 파일 링크), type: string, list: true }
       - { name: highlights, label: 핵심 성과 (한 줄씩), type: string, list: true }
+      - name: metrics
+        label: 숫자 카드 (상세 맨 위, 4개 권장)
+        type: object
+        list: true
+        fields:
+          - { name: value, label: 숫자 (예 352→0ms), type: string }
+          - { name: label, label: 설명, type: string }
+          - { name: target, label: 누르면 이동할 제목 번호 (예 3-2), type: string }
       - name: links
         label: 링크 (GitHub, 스토어, 플레이 영상 등)
         type: object

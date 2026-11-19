@@ -31,6 +31,11 @@ highlights:
   - 기획·사운드 작업이 코드 수정 없이 반영되도록 툴 제작 — 인스펙터 기반 씬 분기, 대사별 효과음 자동 재생
   - 물리·충돌 기반 퍼즐 기믹 설계 — 두 세계 전환(충돌 매트릭스·렌더링·레이캐스트 동기화), 중력 반전 이동, 상태머신 기반 퍼즐 판정
   - 도쿄게임쇼·gamescom·BitSummit·Unite Seoul 등 5개국 전시 30회 이상, Steam 데모 5개 언어 지원
+metrics:
+  - { value: "352→0ms", label: "시작 시 멈춤 제거", target: "3-2" }
+  - { value: "−27%", label: "설치 용량 6.4GB → 4.7GB", target: "3-3" }
+  - { value: "씬 30+→15", label: "회차 플레이 구조 개편", target: "1" }
+  - { value: "F9 한 번", label: "엔딩 분기 QA 툴", target: "5-1" }
 links:
   - label: Steam
     url: https://store.steampowered.com/app/2524200/KILLA/

@@ -150,8 +150,10 @@ const updated = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
 
   <dialog id="modal" aria-label="상세 보기">
     <div class="modal-bar">
+      <span class="modal-where" id="modal-where"></span>
       <button type="button" class="icon-btn" id="copy-link" title="이 항목으로 바로 열리는 링크 복사">링크 복사</button>
       <button type="button" class="icon-btn" id="modal-close" aria-label="닫기">✕</button>
+      <span class="modal-progress" id="modal-progress" aria-hidden="true"></span>
     </div>
     <div class="modal-body" id="modal-body" tabindex="-1" autofocus></div>
   </dialog>
@@ -171,10 +173,35 @@ const updated = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
       store.set('theme', next);
     });
     $('#print-btn')?.addEventListener('click', () => window.print());
-    // 문단이 굵은 라벨(문제·해결 등)로 시작하면 라벨만 강조
-    document.querySelectorAll('.prose p').forEach((p) => { const f = p.firstChild; if (f && f.nodeName === 'STRONG') p.classList.add('lead-label'); });
-    // 인쇄(PDF) 시 접힌 코드도 모두 펼침
-    window.addEventListener('beforeprint', () => document.querySelectorAll('details.code-fold').forEach((d) => (d.open = true)));
+    // 본문 가독성: "3-2. 제목 — 결과" 제목은 번호·결과 배지로, "**문제** — 내용" 문단은 라벨/내용 2열로
+    // (텍스트는 그대로 두고 감싸기만 함 → 인쇄(PDF)에서는 원래 문장 그대로 보임)
+    const wrap = (cls: string, nodes: (Node | string)[]) => { const el = document.createElement('span'); el.className = cls; el.append(...nodes); return el; };
+    const restFrom = (n: ChildNode | null) => { const out: ChildNode[] = []; while (n) { const nx = n.nextSibling; out.push(n); n = nx; } return out; };
+    document.querySelectorAll<HTMLElement>('.prose h2, .prose h3').forEach((h) => {
+      const f = h.firstChild;
+      if (f && f.nodeType === Node.TEXT_NODE) {
+        const m = f.textContent!.match(/^(\d+(?:-\d+)*)\.\s+/);
+        if (m) { f.textContent = f.textContent!.slice(m[1].length + 1); h.insertBefore(wrap('h-num', [`${m[1]}.`]), f); }
+      }
+      const t = [...h.childNodes].find((n) => n.nodeType === Node.TEXT_NODE && n.textContent!.includes(' — '));
+      if (!t) return;
+      const v = t.textContent!; const j = v.indexOf(' — ');
+      const rest = restFrom(t.nextSibling);
+      t.textContent = v.slice(0, j);
+      t.after(wrap('h-sep', [' — ']), wrap('h-badge', [...(v.slice(j + 3) ? [v.slice(j + 3)] : []), ...rest]));
+    });
+    document.querySelectorAll<HTMLElement>('.prose p').forEach((p) => {
+      const s = p.firstChild;
+      if (!s || s.nodeName !== 'STRONG') return;
+      const r = s.nextSibling;
+      const m = r && r.nodeType === Node.TEXT_NODE ? r.textContent!.match(/^\s*—\s*/) : null;
+      if (!m) { p.classList.add('lead-only'); return; }
+      p.classList.add('lead-label');
+      r!.textContent = r!.textContent!.slice(m[0].length);
+      p.replaceChildren(wrap('ll-label', [s]), wrap('ll-sep', [m[0]]), wrap('ll-body', restFrom(r)));
+    });
+    // 인쇄(PDF) 시 접힌 코드·핵심 성과도 모두 펼침
+    window.addEventListener('beforeprint', () => document.querySelectorAll('.all-details details').forEach((d) => (d.open = true)));
 
     // ── 필터 ──
     let kind = 'all';
@@ -248,6 +275,90 @@ const updated = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
     const body = $('#modal-body')!;
     let current: string | null = null;
 
+    // ── 상세 읽기 도우미: 목차 이동 · 현재 위치 · 진행 막대 · 다음 장 버튼 ──
+    const where = $('#modal-where')!;
+    const progress = $('#modal-progress')!;
+    let heads: HTMLElement[] = [];
+    let tocBtns: HTMLElement[] = [];
+    let docTitle = '';
+    const headLabel = (h: HTMLElement) => {
+      const c = h.cloneNode(true) as HTMLElement;
+      c.querySelectorAll('.h-sep, .h-badge').forEach((x) => x.remove());
+      return (c.textContent ?? '').replace(/^(\d+(?:-\d+)*)\.\s*/, '$1 ').trim();
+    };
+    // 좁은 화면에서는 목차가 위에 붙어 있으므로 그 높이만큼 비켜서 이동
+    const stickyGap = () => {
+      const toc = $('.toc', body);
+      return toc && matchMedia('(max-width: 900px)').matches ? toc.offsetHeight : 0;
+    };
+    const targetY = (h: HTMLElement) => h.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop - 12 - stickyGap();
+    let fixTimers: number[] = [];
+    const goTo = (h?: HTMLElement) => {
+      if (!h) return;
+      fixTimers.forEach(clearTimeout);
+      body.scrollTo({ top: targetY(h), behavior: 'smooth' });
+      // 지연 로드 이미지가 들어오며 위치가 밀리면 한 번 더 맞춤
+      fixTimers = [500, 1100].map((ms) => window.setTimeout(() => {
+        if (Math.abs(targetY(h) - body.scrollTop) > 4) body.scrollTo({ top: targetY(h) });
+      }, ms));
+    };
+    function keepVisible(btn: HTMLElement) {
+      const list = btn.closest('ol') as HTMLElement | null;
+      if (!list) return;
+      const li = btn.parentElement as HTMLElement;
+      if (list.scrollHeight > list.clientHeight + 1) {
+        if (li.offsetTop < list.scrollTop) list.scrollTop = li.offsetTop - 8;
+        else if (li.offsetTop + li.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTop = li.offsetTop + li.offsetHeight - list.clientHeight + 8;
+      } else if (list.scrollWidth > list.clientWidth + 1) {
+        if (li.offsetLeft < list.scrollLeft || li.offsetLeft + li.offsetWidth > list.scrollLeft + list.clientWidth) list.scrollLeft = li.offsetLeft - 16;
+      }
+    }
+    let ticking = false;
+    function updateReader() {
+      ticking = false;
+      const top = body.getBoundingClientRect().top + stickyGap();
+      let active: HTMLElement | undefined;
+      for (const h of heads) { if (h.getBoundingClientRect().top - top <= 96) active = h; else break; }
+      let shown: HTMLElement | undefined;
+      tocBtns.forEach((b) => {
+        const on = !!active && b.dataset.toc === active.id && !!b.closest('.toc');
+        b.classList.toggle('is-active', on);
+        if (on && b.offsetParent) shown = b;
+      });
+      // 모바일(큰 제목만 보이는 목차)에서는 상위 장을 표시
+      if (!shown && active) {
+        const parentH2 = heads.slice(0, heads.indexOf(active) + 1).filter((h) => h.tagName === 'H2').pop();
+        const b = tocBtns.find((x) => x.closest('.toc') && x.dataset.toc === parentH2?.id);
+        if (b) { b.classList.add('is-active'); shown = b; }
+      }
+      if (shown) keepVisible(shown);
+      where.replaceChildren();
+      if (docTitle) {
+        const t = document.createElement('strong'); t.textContent = docTitle; where.append(t);
+        if (active) where.append(` · ${headLabel(active)}`);
+      }
+      const max = body.scrollHeight - body.clientHeight;
+      progress.style.width = `${max > 0 ? Math.min(100, (body.scrollTop / max) * 100) : 0}%`;
+    }
+    body.addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(updateReader); } }, { passive: true });
+
+    function setupReader(root: HTMLElement) {
+      heads = $$<HTMLElement>('.prose h2, .prose h3', root);
+      tocBtns = $$<HTMLElement>('[data-toc]', root);
+      docTitle = root.classList.contains('has-toc') ? (root.dataset.title ?? '') : '';
+      tocBtns.forEach((b) => b.addEventListener('click', () => goTo(heads.find((h) => h.id === b.dataset.toc))));
+      if (root.classList.contains('has-toc')) {
+        heads.filter((h) => h.tagName === 'H2').slice(1).forEach((h) => {
+          const b = document.createElement('button');
+          b.type = 'button'; b.className = 'next-sec';
+          b.textContent = `다음 · ${headLabel(h)} →`;
+          b.addEventListener('click', () => goTo(h));
+          h.before(b);
+        });
+      }
+      updateReader();
+    }
+
     function open(uid: string) {
       const src = document.getElementById(`detail-${uid}`);
       if (!src) return;
@@ -256,16 +367,20 @@ const updated = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
       clone.removeAttribute('id');
       body.replaceChildren(clone);
       bindVideos(body);
+      setupReader(clone);
       $$<HTMLElement>('[data-open]', body).forEach((a) => a.addEventListener('click', (e) => {
         e.preventDefault(); open(a.dataset.open!);
       }));
       if (!modal.open) modal.showModal();
       body.scrollTop = 0;
+      updateReader();
       history.replaceState(null, '', `#item/${uid}`);
     }
     modal.addEventListener('close', () => {
       body.replaceChildren(); // 재생 중인 영상 정지
       current = null;
+      heads = []; tocBtns = []; docTitle = '';
+      where.replaceChildren(); progress.style.width = '0%';
       if (location.hash.startsWith('#item/')) history.replaceState(null, '', location.pathname + location.search);
     });
     modal.addEventListener('click', (e) => { if (e.target === modal) modal.close(); });

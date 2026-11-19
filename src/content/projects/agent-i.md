@@ -27,6 +27,11 @@ highlights:
   - 서버 없이 로컬 JSON 목업으로 같은 흐름을 재현해, 서버·클라이언트를 병렬로 개발
   - 플레이테스트 24명 중 91.7%가 "생성형 AI NPC가 다채로운 플레이를 제공한다", 95.8%가 "새로운 재미를 느꼈다"고 응답
   - NPC 인터뷰로 검증 — 집회 시간·장소를 알고 있던 NPC 4명 중 3명이 "다른 NPC와의 대화로 소식을 들었다"고 답해, NPC 간 정보 확산을 확인
+metrics:
+  - { value: "95.8%", label: "\"새로운 재미\" (플레이테스트 24명)", target: "검증" }
+  - { value: "14명", label: "LLM이 행동을 정하는 NPC", target: "AI 구조" }
+  - { value: "BT→LLM", label: "NPC 행동 구조 전환", target: "NPC 행동 구조" }
+  - { value: "서버 없이", label: "로컬 목업으로 병렬 개발", target: "4" }
 links:
   - label: GitHub (클라이언트)
     url: https://github.com/hepachupa/Frontend_Demo
