@@ -5,6 +5,7 @@ import Card from '../components/Card.astro';
 import Detail from '../components/Detail.astro';
 import Video from '../components/Video.astro';
 import profile from '../data/profile.json';
+import focus from '../data/focus.json';
 import { KIND_LABEL, asset, fmtMonth, period, type Kind } from '../lib/util';
 
 const load = async (name: 'projects' | 'awards' | 'activities', kind: Kind) =>
@@ -41,6 +42,10 @@ for (const item of all) {
   if (item.year !== lastYear) { rows.push({ year: item.year }); lastYear = item.year; }
   rows.push({ item });
 }
+
+// 공고별 보기 (?for=<key>) — 같은 내용에서 첫 화면 카드와 상세 섹션 순서만 바꾼다
+const titleOf = (uid: string) => projects.find((p) => p.uid === uid)?.data.title ?? '';
+const focusClient = Object.fromEntries(Object.entries(focus).map(([k, f]) => [k, { order: f.order, featured: f.featured }]));
 
 const now = new Date();
 const updated = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
@@ -86,6 +91,25 @@ const updated = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
         <ul>{profile.skills.map((s) => <li>{s}</li>)}</ul>
       </section>
     )}
+
+    {Object.entries(focus).map(([key, f]) => (
+      <section class="block focus" data-focus={key} hidden>
+        <p class="focus-eyebrow">지원 포지션 · {f.label}</p>
+        <h2 class="section-title">먼저 봐 주셨으면 하는 작업</h2>
+        <p class="focus-intro">{f.intro}</p>
+        <div class="focus-picks">
+          {f.picks.map((p) => (
+            <button type="button" class="focus-pick" data-open={p.uid} data-sec={p.sec}>
+              <span class="fp-project">{titleOf(p.uid)}</span>
+              <strong>{p.title}</strong>
+              <span class="fp-why">{p.why}</span>
+              <span class="fp-go">자세히 보기 →</span>
+            </button>
+          ))}
+        </div>
+      </section>
+    ))}
+    <script type="application/json" id="focus-data" set:html={JSON.stringify(focusClient)}></script>
 
     {featured.length > 0 && (
       <section class="block">
@@ -161,6 +185,38 @@ const updated = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
   <script>
     const $ = <T extends Element = HTMLElement>(s: string, r: ParentNode = document) => r.querySelector(s) as T | null;
     const $$ = <T extends Element = HTMLElement>(s: string, r: ParentNode = document) => [...r.querySelectorAll(s)] as T[];
+    // ── 공고별 보기 (?for=<key>): 첫 화면 카드 표시 + 상세 섹션·목차·대표 프로젝트 순서 변경 ──
+    const focusKey = new URLSearchParams(location.search).get('for');
+    const focusData = JSON.parse(document.getElementById('focus-data')?.textContent || '{}');
+    const fp = focusKey ? focusData[focusKey] : null;
+    const rankOf = (text: string, keys: string[]) => { const i = keys.findIndex((k) => text.includes(k)); return i < 0 ? keys.length : i; };
+    function reorderDetail(uid: string, keys: string[]) {
+      const art = document.getElementById(`detail-${uid}`);
+      const prose = art?.querySelector('.prose');
+      if (!art || !prose) return;
+      const pre: Element[] = []; const groups: Element[][] = [];
+      [...prose.children].forEach((el) => { if (el.tagName === 'H2') groups.push([el]); else (groups.length ? groups[groups.length - 1] : pre).push(el); });
+      const sorted = groups.map((g, i) => ({ g, i, r: rankOf(g[0].textContent ?? '', keys) })).sort((a, b) => a.r - b.r || a.i - b.i);
+      prose.replaceChildren(...pre, ...sorted.flatMap((x) => x.g));
+      const ol = art.querySelector('.toc ol');
+      if (!ol) return;
+      const order = sorted.map((x) => x.g[0].id);
+      const tg: Element[][] = []; const tpre: Element[] = [];
+      [...ol.children].forEach((li) => { if (li.classList.contains('d2')) tg.push([li]); else (tg.length ? tg[tg.length - 1] : tpre).push(li); });
+      const idOf = (g: Element[]) => (g[0].querySelector('[data-toc]') as HTMLElement | null)?.dataset.toc ?? '';
+      tg.sort((a, b) => { const x = order.indexOf(idOf(a)), y = order.indexOf(idOf(b)); return (x < 0 ? 999 : x) - (y < 0 ? 999 : y); });
+      ol.replaceChildren(...tpre, ...tg.flat());
+    }
+    if (fp) {
+      document.querySelector(`[data-focus="${CSS.escape(focusKey!)}"]`)?.removeAttribute('hidden');
+      Object.entries(fp.order as Record<string, string[]>).forEach(([uid, keys]) => reorderDetail(uid, keys));
+      const feat = document.querySelector('.featured');
+      if (feat) {
+        const rank = (el: Element) => { const i = (fp.featured as string[]).indexOf((el as HTMLElement).dataset.open ?? ''); return i < 0 ? 999 : i; };
+        feat.replaceChildren(...[...feat.children].sort((a, b) => rank(a) - rank(b)));
+      }
+    }
+
     const store = {
       get: (k: string) => { try { return localStorage.getItem(k); } catch { return null; } },
       set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch {} },
@@ -359,7 +415,7 @@ const updated = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
       updateReader();
     }
 
-    function open(uid: string) {
+    function open(uid: string, sec?: string) {
       const src = document.getElementById(`detail-${uid}`);
       if (!src) return;
       current = uid;
@@ -374,7 +430,8 @@ const updated = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
       if (!modal.open) modal.showModal();
       body.scrollTop = 0;
       updateReader();
-      history.replaceState(null, '', `#item/${uid}`);
+      if (sec) requestAnimationFrame(() => goTo(heads.find((h) => (h.textContent ?? '').includes(sec))));
+      history.replaceState(null, '', `${location.search}#item/${uid}`);
     }
     modal.addEventListener('close', () => {
       body.replaceChildren(); // 재생 중인 영상 정지
@@ -385,11 +442,11 @@ const updated = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
     });
     modal.addEventListener('click', (e) => { if (e.target === modal) modal.close(); });
     $('#modal-close')?.addEventListener('click', () => modal.close());
-    $$<HTMLElement>('main [data-open]').forEach((c) => c.addEventListener('click', () => open(c.dataset.open!)));
+    $$<HTMLElement>('main [data-open]').forEach((c) => c.addEventListener('click', () => open(c.dataset.open!, c.dataset.sec)));
 
     $('#copy-link')?.addEventListener('click', async (e) => {
       const btn = e.currentTarget as HTMLButtonElement;
-      const url = `${location.origin}${location.pathname}#item/${current}`;
+      const url = `${location.origin}${location.pathname}${location.search}#item/${current}`;
       try { await navigator.clipboard.writeText(url); btn.textContent = '복사됨 ✓'; }
       catch { btn.textContent = '복사 실패'; }
       setTimeout(() => (btn.textContent = '링크 복사'), 1500);
