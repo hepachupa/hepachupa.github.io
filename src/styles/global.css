@@ -455,20 +455,3 @@ details.highlights.fold > ul { padding: 0 18px 14px 36px; }
   .prose p.lead-label { display: block; border: 0; padding: 0; margin: 0 0 10px; }
   .prose p.lead-label + ul, .prose p.lead-label + ol { padding-left: 22px; margin: 0 0 12px; }
 }
-
-/* ───────── 공고별 보기 (?for=) ───────── */
-.focus { padding-top: 40px; }
-.focus-eyebrow { margin: 0 0 6px; font-size: 13px; font-weight: 700; color: var(--accent-text); letter-spacing: 0.02em; }
-.focus .section-title { margin-bottom: 8px; }
-.focus-intro { margin: 0 0 18px; color: var(--muted); max-width: 70ch; }
-.focus-picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap: 12px; }
-.focus-pick { display: flex; flex-direction: column; gap: 6px; text-align: left; font: inherit; color: var(--text); cursor: pointer;
-  background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 12px; padding: 16px 16px 14px;
-  transition: transform .15s, border-color .15s, box-shadow .15s; }
-.focus-pick:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); box-shadow: var(--shadow); }
-.focus-pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.fp-project { font-size: 12px; color: var(--muted); }
-.focus-pick strong { font-size: 16px; letter-spacing: -0.01em; }
-.fp-why { font-size: 14px; line-height: 1.55; color: var(--muted); flex: 1; }
-.fp-go { font-size: 13px; font-weight: 600; color: var(--accent-text); margin-top: 4px; }
-@media print { .focus-pick { break-inside: avoid; } .fp-go { display: none; } }
