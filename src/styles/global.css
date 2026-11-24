@@ -349,6 +349,7 @@ dialog::backdrop { background: rgb(0 0 0 / .6); backdrop-filter: blur(3px); }
 .code-fold[open] > summary::before { transform: rotate(90deg); }
 .code-fold > summary:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .code-fold pre { margin: 0 !important; border-radius: 0 !important; }
+.code-fold > p { margin: 12px 14px; }
 
 /* 문단 맨 앞의 굵은 라벨(문제·원인·해결·결과 등) 강조 */
 .prose p.lead-only > strong:first-child { color: var(--accent-text); }
