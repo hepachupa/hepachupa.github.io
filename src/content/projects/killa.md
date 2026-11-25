@@ -163,9 +163,73 @@ private static bool ConditionMet(Route r)
 
 </details>
 
-## 2. 최적화
+## 2. 콘텐츠 시스템 설계 — 되돌릴 상태와 남길 상태
 
-### 2-1. 씬 최적화 감사 툴
+회차 플레이 게임이라 "세이브를 불러오면 되돌아가야 하는 상태"와 "세이브와 상관없이 쌓여야 하는 상태"가 섞여 있었습니다. 둘을 저장소부터 나누고, 다른 값에서 계산할 수 있는 값은 저장하지 않는다는 원칙으로 콘텐츠 시스템을 만들었습니다.
+
+| 구분 | 저장 위치 | 예 |
+|---|---|---|
+| 되돌릴 상태 | 세이브 슬롯 (대화 시스템 Lua 변수) | 스토리 단계, 퀘스트, 호감도, 남은 목숨 |
+| 남길 상태 | 영구 프로필 `profile.json` (`PlayerProfile`) | 엔딩 수집, 데드씬 수집, 게임오버 기록, 누적 플레이타임, 업적(구조만 마련) |
+| 저장하지 않는 값 | 매번 계산 | 하루 남은 행동력 = 하루 한도 − 오늘 대화한 NPC 수 |
+
+### 2-1. 게임오버 → 히든 엔딩 — `GameOverService`
+
+**설계** — 콘텐츠마다 목숨을 따로 두고, 목숨을 모두 잃으면 게임오버 화면(콘텐츠별 일러스트·제목·날짜·플레이타임)을 거쳐 게임오버 씬으로 이동합니다. 게임오버 횟수가 기준을 넘으면 같은 흐름이 히든 엔딩으로 이어집니다. 실패를 그대로 끝내지 않고 회차 진행의 일부로 만드는 구조입니다.
+
+- **기록 먼저, 연출은 나중** — 기록을 연출 전에 영구 프로필에 저장해, 연출 도중 게임을 꺼도 횟수가 빠지지 않음
+- **세이브와 분리** — 게임오버 기록은 세이브 슬롯이 아니라 프로필에 누적되므로, 직전 세이브를 불러와도 횟수가 유지되어 히든 엔딩 조건이 되돌아가지 않음
+- **조건은 데이터로** — 히든 엔딩 기준(횟수, 총 횟수/콘텐츠 종류 수 중 무엇을 셀지)을 카탈로그 ScriptableObject에서 지정. 카탈로그에 등록되지 않은 ID로 요청하면 게임오버 자체를 취소해, 데이터 누락이 조용히 지나가지 않게 함
+- **대화와의 연결** — 대화 조건에서 `GameOverCount()` 같은 Lua 함수로 기록을 읽어 대사를 분기. 대화 스크립트에서 게임오버를 요청하면 한 프레임 미뤄 실행해, 대화 종료 처리와 겹쳐 재진입이 일어나지 않게 함
+
+<details class="code-fold">
+<summary>코드 보기 — GameOverService.RequestInternal (발췌)</summary>
+
+```csharp
+private bool RequestInternal(GameOverData data)
+{
+    if (isRunning || data == null) return false;
+    string normalScene = ResolveNormalScene(data);
+    if (!Application.CanStreamedLevelBeLoaded(normalScene)) return false; // 빌드에 없는 씬이면 취소
+
+    // 1. 기록 먼저 (연출 도중 종료해도 카운트). 세이브 슬롯이 아니라 영구 프로필에 누적
+    GameOverRecord record = PlayerProfile.Instance?.AddGameOverRecord(data.Id, maxStoredRecords);
+
+    // 2. 히든 엔딩 판정 (이번 기록 포함)
+    bool hidden = IsHiddenEndingConditionMet();
+    string target = hidden && Application.CanStreamedLevelBeLoaded(catalog.HiddenEndingSceneName)
+        ? catalog.HiddenEndingSceneName : normalScene;
+    if (hidden && catalog.MarkEndingOnTrigger) MarkHiddenEndingSeen();
+
+    LastResult = new GameOverResult { Data = data, Record = record, HiddenEnding = hidden, SceneName = target };
+    StartCoroutine(GameOverRoutine(LastResult)); // 3. 게임오버 UI → 4. 씬 로드 후 GameOverZone이 결과를 읽어 오브젝트 활성화
+    return true;
+}
+
+public bool IsHiddenEndingConditionMet()
+{
+    if (catalog == null || !catalog.HiddenEndingEnabled) return false;
+    var profile = PlayerProfile.Instance;
+    if (profile == null || profile.HasAchievedEnding(catalog.HiddenEndingId)) return false; // 이미 봤으면 다시 발동하지 않음
+
+    int progress = catalog.CountMode == HiddenEndingCountMode.UniqueContents
+        ? profile.GetUniqueGameOverCount()   // 서로 다른 콘텐츠에서 당한 수
+        : profile.GetGameOverCount();        // 총 횟수
+    return progress >= catalog.HiddenEndingThreshold;
+}
+```
+
+</details>
+
+### 2-2. 하루 행동력 — 저장하지 않고 계산
+
+하루에 대화할 수 있는 NPC 수에 한도가 있는 구조입니다. 남은 행동력을 별도 변수로 저장하면 대화 기록과 행동력 두 값이 생기고, 세이브·로드나 대화 스킵 경로에서 둘이 어긋날 수 있습니다. 그래서 남은 행동력은 저장하지 않고 **"오늘 대화한 NPC 수"에서 매번 계산**하도록 해, 어긋날 수 있는 상태 자체를 없앴습니다. 호감도도 NPC별 대화 시스템 전역 변수에 두어 세이브와 대화 분기가 같은 값을 읽습니다.
+
+**아쉬운 점** — 영구 프로필은 JSON 파일 하나를 바로 덮어쓰는 방식이라, 저장 중 전원이 꺼져 파일이 깨지면 기본값으로 새로 만들면서 수집 기록이 사라질 수 있습니다. 임시 파일에 먼저 쓴 뒤 교체하고 이전 파일을 백업으로 남기는 방식, 그리고 구조가 바뀌어도 이전 파일을 읽을 수 있도록 버전 필드를 두는 처리가 출시 전에 필요합니다.
+
+## 3. 최적화
+
+### 3-1. 씬 최적화 감사 툴
 
 **문제** — 장소(LOC) 씬이 늘어나면서 씬마다 불필요한 컴포넌트, 중복 라이트·볼륨, 미사용 오브젝트가 쌓였고, 수작업으로 확인하기에는 씬 수가 많았습니다.
 
@@ -173,7 +237,7 @@ private static bool ConditionMet(Route r)
 
 **결과** — 최적화 대상을 사람의 감이 아니라 리포트 기준으로 관리하게 되었습니다.
 
-### 2-2. 시작 시 멈춤 제거 — 노이즈 생성 352ms → 0ms
+### 3-2. 시작 시 멈춤 제거 — 노이즈 생성 352ms → 0ms
 
 **문제** — 게임을 시작하면 로딩 중 화면이 약 4초간 검게 보이는 현상이 있었습니다. Profiler로 측정하자 그 구간에서 후처리 플러그인(VolFx)이 시작할 때마다 노이즈 이미지를 매번 새로 그리는 작업이 가장 큰 비중을 차지하는 것으로 나타났습니다.
 
@@ -204,7 +268,7 @@ private static bool ConditionMet(Route r)
 
 **발견** — 처음 측정에서는 노이즈 생성 하나가 약 4초를 차지하는 것처럼 보였지만, 실제 비용은 352ms였습니다. 상세 측정 모드(Deep Profiling)가 켜져 있으면 작은 함수를 많이 부르는 코드일수록 실제보다 훨씬 느리게 측정되기 때문입니다(같은 코드가 352ms vs 3,227ms). AI의 분석도, 측정 도구의 숫자도 그대로 믿지 않고 같은 조건에서 다시 재는 원칙을 이 과정에서 세웠습니다.
 
-### 2-3. 설치 용량 감축 — 6.4GB → 4.7GB (−27%)
+### 3-3. 설치 용량 감축 — 6.4GB → 4.7GB (−27%)
 
 **문제** — 출시용 빌드가 6.4GB였고, 대부분이 압축되지 않은 이미지였습니다. 압축 설정을 해 두었는데도 용량이 줄지 않고 있었습니다.
 
@@ -229,7 +293,7 @@ private static bool ConditionMet(Route r)
 
 </details>
 
-## 3. 배포 · 빌드 파이프라인
+## 4. 배포 · 빌드 파이프라인
 
 **문제** — 전시용, QA용, 출시용 빌드마다 시작 지점과 설정이 달라 매번 수동으로 변경해야 했고, 작은 실수가 빌드 사고로 이어졌습니다.
 
@@ -237,7 +301,7 @@ private static bool ConditionMet(Route r)
 
 **결과** — 빌드 종류를 설정만으로 전환할 수 있게 되어 BIC 등 전시와 QA 빌드를 코드 수정 없이 내보냈고, 전시·퍼블리셔 일정에 맞춰 팀이 빌드를 기다리지 않게 되었습니다.
 
-### 3-1. 코드: 어디서든 시작하는 빌드 — `BuildConfig.StartPoint`
+### 4-1. 코드: 어디서든 시작하는 빌드 — `BuildConfig.StartPoint`
 
 전시·QA 빌드를 코드 수정 없이 만들기 위해, "어디서부터 시작할지"를 **씬 + 스토리 단계 + 스폰 위치 + 날짜 + 초기 Lua**의 데이터 묶음으로 정의했습니다. ScriptableObject 하나로 Normal / GameShow / QA 모드를 전환합니다.
 
@@ -275,7 +339,7 @@ public class BuildConfig : ScriptableObject
 
 </details>
 
-## 4. QA 자동화 · 안정화
+## 5. QA 자동화 · 안정화
 
 **문제** — 분기 서사 게임이라 버그 하나를 재현하려면 앞부분 대사를 모두 진행해야 했습니다. 출시 준비 단계에서는 QA 시트로 버그가 한 번에 수십 건씩 들어왔고, 분류 → 수정 → 검증 → 빌드 → 공유를 매번 손으로 반복했습니다.
 
@@ -287,7 +351,7 @@ public class BuildConfig : ScriptableObject
 | ② QA 시트 처리 | 시트 행 분류 → Unity에서 수정 → 러너로 검증 → 시트에 결과·원인 기록 | 판단이 애매한 행은 "확인 필요" + 질문 |
 | ③ 매일 정기 실행 | 새 행 감지 → 브랜치 → 수정 → 커밋 → 빌드 → Drive 업로드 → 시트에 링크 | PR 검토 후 병합 |
 
-### 4-1. 스모크 테스트 러너 — `QASmokeRunner`
+### 5-1. 스모크 테스트 러너 — `QASmokeRunner`
 
 에디터 메뉴(`KILLA > QA > Smoke Test`)를 누르면 Bootstrap 씬을 거쳐 전역 매니저 준비를 기다린 뒤, 모드별 테스트를 돌리고 Markdown 리포트를 남기고 Play를 종료합니다.
 
@@ -297,7 +361,7 @@ public class BuildConfig : ScriptableObject
 - **Flow** — 실제로 대사를 진행하고 UI를 클릭하며 진행 멈춤(시간 초과), 화면을 덮은 검은 이미지, 플레이어와 바닥 사이 간격, 활성 카메라를 기록하고 단계마다 스크린샷 저장
 - 에디터가 포커스를 잃으면 Play 루프가 멈추기 때문에, 테스트 동안에만 `runInBackground`와 에디터 Interaction Mode를 바꾸고 원래 값은 저장해 두었다가 종료 시 복원
 
-### 4-2. QA 시트 → 자동 수정 · 빌드 · 업로드
+### 5-2. QA 시트 → 자동 수정 · 빌드 · 업로드
 
 Claude가 Unity MCP로 에디터를 조작해 QA 시트를 처리하는 절차를 **스킬과 런북 문서**로 고정하고, 매일 정해진 시각에 정기 작업으로 실행되게 했습니다. 에디터 쪽에는 그 작업이 호출할 메뉴(`QAAutoBuild`)를 만들었습니다.
 
@@ -348,7 +412,7 @@ public static void GitCommit()
 
 **아쉬운 점** — 지금 구조는 PC 한 대에서 Unity 에디터가 켜져 있어야 동작합니다. 팀이 커지거나 빌드가 잦아지면 빌드는 CI 서버(Jenkins 등)에서 batchmode로 돌리고, Claude는 시트 분류·수정 단계만 맡도록 나누는 것이 맞습니다. 또 스모크 러너는 멈춤·에러·검은 화면 같은 기계적인 문제만 잡기 때문에, 연출 타이밍이나 문장의 어색함은 여전히 사람이 확인합니다.
 
-### 4-3. 엔딩 분기 QA 툴 — 에디터 창 + 빌드용 오버레이
+### 5-3. 엔딩 분기 QA 툴 — 에디터 창 + 빌드용 오버레이
 
 **문제** — KILLA는 플레이어의 선택과 호감도에 따라 여러 엔딩으로 갈라집니다. 엔딩 하나를 확인하려면 해당 분기 지점까지 직접 플레이하며 조건 변수를 맞춰야 했고, 엔딩 판정 규칙을 고칠 때마다 모든 경로를 다시 확인해야 했습니다. 판정이 기대와 다르게 나와도 **어떤 조건 때문에 그 엔딩이 됐는지** 보이지 않았습니다.
 
@@ -436,14 +500,14 @@ private void Jump(EndingQAPresets.Preset p)
 
 </details>
 
-### 4-4. 안정화
+### 5-4. 안정화
 
 - 전역 매니저 14종 전수 감사 — DontDestroyOnLoad 중복 가드, 실행 순서 정리, Lua 변수명 `GLOBAL.XXX` 규칙으로 통일
 - `GlobalVarAuditor`로 대화 데이터베이스의 변수 오탈자·미사용 변수 자동 검출
 - 세이브/로드 전면 개편: 슬롯 불일치, 씬 전환 중 저장 타이밍, NPC 위치 복원, 대화 중복 재생 문제 해결
 - 프로젝트 손상(URP 렌더러, 스크립팅 심볼, 자막 프리팹) 발생 시 Git 이력으로 복구
 
-## 5. 협업 툴: 대사별 FMOD 효과음 자동 재생
+## 6. 협업 툴: 대사별 FMOD 효과음 자동 재생
 
 **문제** — 대사에 맞춰 효과음을 넣으려면 씬에 이벤트를 따로 배치하거나, 대사 노드마다 이벤트를 일일이 입력해야 했습니다. 효과음을 추가하거나 교체할 때마다 씬 수정과 반복 입력 작업이 필요했습니다.
 
@@ -487,11 +551,143 @@ private void OnLine(Subtitle subtitle)
 
 </details>
 
-## 6. 퍼즐 · 기믹 설계
+## 7. 가방 · 수첩 UI — 뷰 전환 · 입력 소유권 · 대화 연동
+
+**문제** — 가방 UI는 메뉴·인벤토리·노트·지도·파우치 5개 화면이 Spine 열기/닫기 애니메이션으로 전환되고, 대화 중에는 아이템을 골라 제출하는 화면으로도 쓰입니다. 전환 애니메이션 도중 입력이 들어오거나, 다른 시스템(노트 책장 넘김 등)이 각자 레이캐스터를 끄고 켜면서 입력이 풀리지 않거나, 대화가 인벤토리 결과를 기다리다 멈추는 문제가 반복됐습니다.
+
+<img src="/images/killa-note-suspect.gif" alt="수첩 — 용의자에 대하여(목록 → 안젤라 → 스티커 상세)와 사건에 대하여(Day 3 · 4 → 사건 페이지 넘기기)" loading="lazy" decoding="async" />
+
+*수첩의 '용의자에 대하여'(목록 → 안젤라 → 스티커 상세)와 '사건에 대하여'(Day 3 · 4 → 사건 페이지 넘기기) — 셰이더로 그린 책장 넘김, 미확인 항목의 느낌표 배지*
+
+**해결** — 화면 전환과 입력 권한을 `BagManager` 한곳으로 모았습니다.
+
+- **뷰 전환 상태머신** — 화면을 `BagView` 상태로 두고 전환은 하나의 코루틴만 거치게 함. 처음 열기 / 메뉴 → 하위 화면 / 하위 화면끼리 세 경우로 나눠 "이전 화면 닫기 애니메이션 완료 → 다음 화면 열기" 순서를 보장하고, 전환 중에는 입력을 받지 않음
+- **입력 소유권** — `GraphicRaycaster` on/off는 BagManager만 결정. 다른 시스템은 `SetExternalInputLock(owner, bool)`로 요청만 하고, 소유자별 `HashSet`으로 관리해 같은 시스템이 여러 번 잠가도 한 번으로 취급하고 파괴된 소유자는 자동으로 정리
+- **해금 상태는 데이터 한곳** — 가방·노트·지도·파우치 해금은 대화 시스템 변수를 유일한 원천으로 두어 세이브/로드에서 자동 복원
+- **강제 정리** — 씬 전환·게임오버·컷신 진입 시에는 연출 없이 즉시 닫아, 전환 코루틴이 끊기며 플래그가 남아 플레이어 이동이 막히던 문제를 복구
+
+**돌아보면** — 화면 상태를 enum과 분기문으로 관리하고 있어, 화면이 더 늘어나면 전환 규칙을 표로 정의하거나 화면 스택 구조로 바꾸는 편이 유지보수에 낫습니다.
+
+<details class="code-fold">
+<summary>코드 보기 — BagManager 뷰 전환 · 입력 소유권 (발췌)</summary>
+
+```csharp
+private bool StartSwitchView(BagView targetView)
+{
+    if (!CanOpenView(targetView)) return false;     // 해금 안 된 기능이면 버튼·API 모두 차단
+    if (targetView == currentView) return false;
+    if (IsInteractionLocked) return false;           // 전환·닫기 연출 중
+    switchRoutine = StartCoroutine(SwitchViewRoutine(targetView));
+    return true;
+}
+
+private IEnumerator SwitchViewRoutine(BagView toView)
+{
+    BagView fromView = currentView;
+    isTransition = true;
+    SetRaycastWanted(false);                         // 전환 중 입력 차단
+
+    if (fromView == BagView.None)                    // 처음 열기
+    {
+        if (!suppressNextBagZoom) ApplyBagZoom();    // 대화용 오픈이면 카메라 줌 생략
+        suppressNextBagZoom = false;
+        SetView(toView);
+        yield return PlayGroupAndWait(toView, true);
+    }
+    else if (fromView == BagView.Menu)               // 메뉴 → 하위 화면
+    {
+        SetView(toView);
+        yield return PlayGroupAndWait(toView, true);
+        PlayGroupNoWait(BagView.Menu, false);        // 다음에 메뉴가 켜질 때의 시작 포즈
+    }
+    else                                             // 하위 화면 → 메뉴 / 하위 화면끼리
+    {
+        yield return PlayGroupAndWait(fromView, false);  // 닫기 애니메이션이 끝난 뒤
+        SetView(toView);
+        yield return PlayGroupAndWait(toView, true);     // 다음 화면 열기
+    }
+
+    switchRoutine = null;
+    isTransition = false;
+    SetRaycastWanted(true);
+}
+
+// 다른 시스템은 레이캐스터를 직접 끄지 않고 "잠금 요청"만 한다
+public void SetExternalInputLock(UnityEngine.Object owner, bool locked)
+{
+    if (owner == null) return;
+    if (locked) externalInputLocks.Add(owner); else externalInputLocks.Remove(owner);
+    RefreshRaycasters();
+}
+
+private void RefreshRaycasters()
+{
+    externalInputLocks.RemoveWhere(o => o == null);  // 파괴된 소유자 정리
+    bool enable = raycastWanted && externalInputLocks.Count == 0;
+    foreach (var r in raycasters) if (r != null) r.enabled = enable;
+}
+```
+
+</details>
+
+### 7-1. 대화 ↔ 인벤토리 제출 — 데이터 기반 사용 조건
+
+- 아이템은 ScriptableObject(`InventoryItem`)로 정의하고, 사용 가능한 곳을 `(씬, 스토리 단계)` 규칙 목록으로 데이터화. 규칙이 없으면 어디서나, 씬만 지정하면 그 씬 전체에서 사용 가능
+- 대화가 인벤토리를 열면 모든 아이템을 보여 주되 현재 상황에 맞는 아이템만 제출 버튼이 활성화. 대화 중에는 닫기를 막고, 제출 결과는 대화 변수로 돌려줘 분기에 사용 (`InventoryDialogueBridge`)
+- 대화가 `WaitForMessage`로 인벤토리 결과를 기다리는 구조라, 가방을 아직 얻지 못했거나 QA 빨리감기 중이면 대화가 영원히 멈출 수 있었음 → 열 수 없으면 "사용 안 함" 결과를 돌려주고, 메시지는 대기 등록이 끝난 한 프레임 뒤에 보내도록 수정
+- 대화 조건에서 `HasInventoryItem("id")` 같은 Lua 함수로 소지 여부를 확인. 씬마다 매니저가 중복 생성됐다 파괴될 때 전역 Lua 함수까지 지워지던 문제를 "등록 소유자 1개 + 해제 시 남은 인스턴스로 넘기기"로 해결
+
+### 7-2. 수첩 알림 배지 — 하위 확인 상태로 상위 표시를 계산
+
+수첩의 용의자 목록과 상세 화면에 새 정보를 알리는 느낌표가 있었는데, 원래는 고정 이미지라 내용을 다 확인해도 목록의 느낌표가 계속 남아 있었습니다.
+
+- 상세 화면 안의 느낌표는 그 항목을 누르거나 커서를 올리면 "확인"으로 기록하고 끔
+- 목록의 느낌표는 따로 켜고 끄지 않고, **그 캐릭터 상세에 아직 확인하지 않은(현재 보이는) 느낌표가 있는지로 계산** — 하위 상태에서 상위 표시를 파생시켜 둘이 어긋나지 않게 함
+- 확인 기록은 대화 시스템 변수(`NOTE.NOTICE_READ`)에 저장해 세이브/로드에 함께 들어감
+- 느낌표 스프라이트와 계층 경로로 대상을 찾아 런타임에 자동 부착 — 아티스트가 만든 프리팹은 수정하지 않음
+
+### 7-3. 알림 큐 — 아이템 알림과 퀘스트 알림의 우선순위
+
+아이템 획득·저장 알림은 즉시, 퀘스트 알림은 대화가 끝난 뒤에 보여야 해서 큐를 둘로 나눴습니다. 하나의 코루틴이 아이템 큐를 먼저 비우고, 퀘스트 알림은 대화 종료와 짧은 지연을 기다리되 그 사이 아이템 알림이 들어오면 즉시 양보합니다.
+
+<details class="code-fold">
+<summary>코드 보기 — NotificationManager.ProcessQueue (축약)</summary>
+
+```csharp
+private IEnumerator ProcessQueue()
+{
+    _isProcessing = true;
+    while (_itemQueue.Count > 0 || _questQueue.Count > 0)
+    {
+        while (_itemQueue.Count > 0)                 // 아이템·저장 알림은 즉시
+            yield return _itemQueue.Dequeue()();
+
+        if (_questQueue.Count == 0) continue;
+
+        while (DialogueManager.IsConversationActive) // 퀘스트 알림은 대화가 끝난 뒤
+        {
+            yield return null;
+            if (_itemQueue.Count > 0) break;         // 기다리는 중 아이템 알림이 오면 양보
+        }
+        if (_itemQueue.Count > 0) continue;
+
+        for (float t = 0f; t < afterDialogueDelay && _itemQueue.Count == 0; t += Time.deltaTime)
+            yield return null;
+        if (_itemQueue.Count > 0) continue;
+
+        yield return _questQueue.Dequeue()();
+    }
+    _isProcessing = false;
+}
+```
+
+</details>
+
+## 8. 퍼즐 · 기믹 설계
 
 장면마다 조작 방식이 다른 퍼즐과 기믹을 여러 종 만들었습니다. 스포일러를 피하기 위해 장면과 인물은 밝히지 않고, 구조 위주로 정리했습니다.
 
-### 6-1. 두 세계 전환 기믹 — 충돌 · 렌더링 · 레이캐스트 동기화
+### 8-1. 두 세계 전환 기믹 — 충돌 · 렌더링 · 레이캐스트 동기화
 
 **문제** — 같은 공간에 겹쳐 있는 두 버전의 세계(기본 / 숨겨진 세계)를 플레이어가 버튼 하나로 오가야 했습니다. 화면에서만 바꾸면 보이지 않는 세계의 벽에 부딪히거나, 보이지 않는 바닥을 밟고 서 있는 문제가 생깁니다.
 
@@ -554,7 +750,7 @@ private void SetIgnoreBetweenMasks(int maskA, int maskB, bool ignore)
 
 **아쉬운 점** — 레이어 충돌 매트릭스는 프로젝트 전역 설정이라 씬을 나갈 때 원래 값으로 복원하도록 만들었지만, 이 설정을 바꾸는 기믹이 늘어나면 서로 덮어쓸 수 있습니다. 그때는 충돌 설정 변경을 한 매니저가 소유하고, 요청을 모아 계산하는 방식으로 바꿔야 합니다.
 
-### 6-2. 중력 반전 이동 — 천장 걷기
+### 8-2. 중력 반전 이동 — 천장 걷기
 
 **문제** — 특정 구역에 들어가면 천장을 바닥처럼 걷는 기믹이 필요했습니다. 캐릭터 루트를 뒤집으면 CharacterController와 NavMesh 이동이 함께 깨집니다.
 
@@ -600,11 +796,14 @@ private void SnapUnderCeiling()
 
 <!-- GIF 자리: 발사 → 천장 착지 → 천장 걷기 (5~10초) -->
 
-### 6-3. 퍼즐 판정을 상태머신으로 — 정답 누락 · 중복 발생 수정
+### 8-3. 퍼즐 판정을 상태머신으로 — 정답 누락 · 중복 발생 수정
 
 **문제** — 같은 색의 점을 선으로 이어 모든 칸을 채우는 경로 퍼즐에서, 처음에는 **끝점에서 손을 뗀 순간에만** 정답을 검사했습니다. 마지막 연결을 끝점이 아닌 곳에서 마무리하면 정답이 잡히지 않았고, 정답 상태를 기억하지 않아 성공 이벤트가 여러 번 발생할 수 있었습니다.
 
 **해결** — 보드가 바뀔 때마다 판정하되, `Playing → Resolving → Solved` 상태머신으로 결과를 한 번만 처리하도록 바꿨습니다.
+
+- **입력은 보드가 모두 받음** — 칸마다 손 떼기(PointerUp) 이벤트를 달면 보드 밖에서 손을 뗐을 때 이벤트가 어디에도 도착하지 않아 "그리는 중" 상태가 남습니다. 누르기·드래그·떼기를 보드 하나가 받게 해, 손을 어디서 떼든 종료가 보장되게 했습니다
+- **역할 분리** — 보드(그리드·경로 상태·입력), 판정(정답·연출 훅), 선 그리기를 각각 다른 클래스로 나눔
 
 - 정답이면 즉시 보드를 잠그고, 마지막 선이 그려지는 연출 시간을 둔 뒤 성공 이벤트를 **1회만** 발생
 - 모든 쌍을 이었지만 빈칸이 남으면 오답 처리 후 자동 초기화. 단, **선을 그리는 도중에는 오답 판정을 하지 않음** — 마지막 쌍을 잇는 순간 손가락 밑에서 보드가 리셋되면 조작감이 망가지기 때문
@@ -642,7 +841,7 @@ public void Evaluate()
 
 </details>
 
-### 6-4. 드래그 앤 드롭 퍼즐 공통 구조
+### 8-4. 드래그 앤 드롭 퍼즐 공통 구조
 
 아이템을 끌어 대상 위치에 사용하는 퍼즐 여러 종을 같은 구조로 만들었습니다.
 
