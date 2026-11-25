@@ -551,305 +551,43 @@ private void OnLine(Subtitle subtitle)
 
 </details>
 
-## 7. 가방 · 수첩 UI — 뷰 전환 · 입력 소유권 · 대화 연동
+## 7. 가방 · 수첩 UI
 
-**문제** — 가방 UI는 메뉴·인벤토리·노트·지도·파우치 5개 화면이 Spine 열기/닫기 애니메이션으로 전환되고, 대화 중에는 아이템을 골라 제출하는 화면으로도 쓰입니다. 전환 애니메이션 도중 입력이 들어오거나, 다른 시스템(노트 책장 넘김 등)이 각자 레이캐스터를 끄고 켜면서 입력이 풀리지 않거나, 대화가 인벤토리 결과를 기다리다 멈추는 문제가 반복됐습니다.
+메뉴·인벤토리·수첩·지도·파우치 5개 화면이 Spine 연출로 전환되는 가방 UI와, 셰이더로 책장을 넘기는 수첩을 만들었습니다. 화면 전환·입력 잠금을 한 매니저가 관리하고, 대화 중 아이템 제출, 미확인 항목 느낌표 배지, 아이템·퀘스트 알림 큐를 함께 구현했습니다.
 
 <img src="/images/killa-note-suspect.gif" alt="수첩 — 용의자에 대하여(목록 → 안젤라 → 스티커 상세)와 사건에 대하여(Day 3 · 4 → 사건 페이지 넘기기)" loading="lazy" decoding="async" />
 
-*수첩의 '용의자에 대하여'(목록 → 안젤라 → 스티커 상세)와 '사건에 대하여'(Day 3 · 4 → 사건 페이지 넘기기) — 셰이더로 그린 책장 넘김, 미확인 항목의 느낌표 배지*
+*수첩의 '용의자에 대하여'(목록 → 안젤라 → 스티커 상세)와 '사건에 대하여'(Day 3 · 4 → 사건 페이지 넘기기)*
 
-**해결** — 화면 전환과 입력 권한을 `BagManager` 한곳으로 모았습니다.
+## 8. 퍼즐 · 기믹
 
-- **뷰 전환 상태머신** — 화면을 `BagView` 상태로 두고 전환은 하나의 코루틴만 거치게 함. 처음 열기 / 메뉴 → 하위 화면 / 하위 화면끼리 세 경우로 나눠 "이전 화면 닫기 애니메이션 완료 → 다음 화면 열기" 순서를 보장하고, 전환 중에는 입력을 받지 않음
-- **입력 소유권** — `GraphicRaycaster` on/off는 BagManager만 결정. 다른 시스템은 `SetExternalInputLock(owner, bool)`로 요청만 하고, 소유자별 `HashSet`으로 관리해 같은 시스템이 여러 번 잠가도 한 번으로 취급하고 파괴된 소유자는 자동으로 정리
-- **해금 상태는 데이터 한곳** — 가방·노트·지도·파우치 해금은 대화 시스템 변수를 유일한 원천으로 두어 세이브/로드에서 자동 복원
-- **강제 정리** — 씬 전환·게임오버·컷신 진입 시에는 연출 없이 즉시 닫아, 전환 코루틴이 끊기며 플래그가 남아 플레이어 이동이 막히던 문제를 복구
+장면마다 조작 방식이 다른 퍼즐과 기믹을 만들었습니다. 스포일러를 피하기 위해 장면과 인물은 밝히지 않습니다.
 
-**돌아보면** — 화면 상태를 enum과 분기문으로 관리하고 있어, 화면이 더 늘어나면 전환 규칙을 표로 정의하거나 화면 스택 구조로 바꾸는 편이 유지보수에 낫습니다.
+**두 세계 전환** — 겹쳐 있는 두 세계를 버튼 하나로 오가며 렌더링·충돌·레이캐스트를 함께 전환
 
-<details class="code-fold">
-<summary>코드 보기 — BagManager 뷰 전환 · 입력 소유권 (발췌)</summary>
+<img src="/images/killa-two-worlds.gif" alt="두 세계 전환" loading="lazy" decoding="async" />
 
-```csharp
-private bool StartSwitchView(BagView targetView)
-{
-    if (!CanOpenView(targetView)) return false;     // 해금 안 된 기능이면 버튼·API 모두 차단
-    if (targetView == currentView) return false;
-    if (IsInteractionLocked) return false;           // 전환·닫기 연출 중
-    switchRoutine = StartCoroutine(SwitchViewRoutine(targetView));
-    return true;
-}
+**중력 반전 이동** — 발사 구역에서 쏘아 올려 천장을 바닥처럼 걷는 이동
 
-private IEnumerator SwitchViewRoutine(BagView toView)
-{
-    BagView fromView = currentView;
-    isTransition = true;
-    SetRaycastWanted(false);                         // 전환 중 입력 차단
+<img src="/images/killa-gravity.gif" alt="중력 반전 이동" loading="lazy" decoding="async" />
 
-    if (fromView == BagView.None)                    // 처음 열기
-    {
-        if (!suppressNextBagZoom) ApplyBagZoom();    // 대화용 오픈이면 카메라 줌 생략
-        suppressNextBagZoom = false;
-        SetView(toView);
-        yield return PlayGroupAndWait(toView, true);
-    }
-    else if (fromView == BagView.Menu)               // 메뉴 → 하위 화면
-    {
-        SetView(toView);
-        yield return PlayGroupAndWait(toView, true);
-        PlayGroupNoWait(BagView.Menu, false);        // 다음에 메뉴가 켜질 때의 시작 포즈
-    }
-    else                                             // 하위 화면 → 메뉴 / 하위 화면끼리
-    {
-        yield return PlayGroupAndWait(fromView, false);  // 닫기 애니메이션이 끝난 뒤
-        SetView(toView);
-        yield return PlayGroupAndWait(toView, true);     // 다음 화면 열기
-    }
+**체스말 퍼즐** — 체스말의 이동 규칙대로 말을 옮겨 길을 찾는 퍼즐, 틀린 수는 연출과 함께 초기화
 
-    switchRoutine = null;
-    isTransition = false;
-    SetRaycastWanted(true);
-}
+<img src="/images/killa-chess-puzzle.gif" alt="체스말 퍼즐" loading="lazy" decoding="async" />
 
-// 다른 시스템은 레이캐스터를 직접 끄지 않고 "잠금 요청"만 한다
-public void SetExternalInputLock(UnityEngine.Object owner, bool locked)
-{
-    if (owner == null) return;
-    if (locked) externalInputLocks.Add(owner); else externalInputLocks.Remove(owner);
-    RefreshRaycasters();
-}
+**진실의 필름 퍼즐** — 인물의 필름 장면을 넘겨 보며 질문에 맞는 장면을 골라 필름 릴을 채우는 추리 퍼즐
 
-private void RefreshRaycasters()
-{
-    externalInputLocks.RemoveWhere(o => o == null);  // 파괴된 소유자 정리
-    bool enable = raycastWanted && externalInputLocks.Count == 0;
-    foreach (var r in raycasters) if (r != null) r.enabled = enable;
-}
-```
+<img src="/images/killa-film-puzzle.gif" alt="진실의 필름 퍼즐" loading="lazy" decoding="async" />
 
-</details>
+**간수 이동 경로 퍼즐** — 같은 색 점을 이어 모든 칸을 채우는 경로 퍼즐, 보드가 바뀔 때마다 판정하고 상태머신으로 정답을 한 번만 처리
 
-### 7-1. 대화 ↔ 인벤토리 제출 — 데이터 기반 사용 조건
+<img src="/images/killa-guard-route.gif" alt="간수 이동 경로 퍼즐" loading="lazy" decoding="async" />
 
-- 아이템은 ScriptableObject(`InventoryItem`)로 정의하고, 사용 가능한 곳을 `(씬, 스토리 단계)` 규칙 목록으로 데이터화. 규칙이 없으면 어디서나, 씬만 지정하면 그 씬 전체에서 사용 가능
-- 대화가 인벤토리를 열면 모든 아이템을 보여 주되 현재 상황에 맞는 아이템만 제출 버튼이 활성화. 대화 중에는 닫기를 막고, 제출 결과는 대화 변수로 돌려줘 분기에 사용 (`InventoryDialogueBridge`)
-- 대화가 `WaitForMessage`로 인벤토리 결과를 기다리는 구조라, 가방을 아직 얻지 못했거나 QA 빨리감기 중이면 대화가 영원히 멈출 수 있었음 → 열 수 없으면 "사용 안 함" 결과를 돌려주고, 메시지는 대기 등록이 끝난 한 프레임 뒤에 보내도록 수정
-- 대화 조건에서 `HasInventoryItem("id")` 같은 Lua 함수로 소지 여부를 확인. 씬마다 매니저가 중복 생성됐다 파괴될 때 전역 Lua 함수까지 지워지던 문제를 "등록 소유자 1개 + 해제 시 남은 인스턴스로 넘기기"로 해결
+**공명 시스템** — 상징을 끌어 다른 상징에 놓으면 선을 따라 합쳐지며 새 상징이 나오는 조합 UI, 조합 결과는 ScriptableObject 데이터로 정의
 
-### 7-2. 수첩 알림 배지 — 하위 확인 상태로 상위 표시를 계산
+<img src="/images/killa-symbol-fx.webp" alt="공명 시스템" loading="lazy" decoding="async" />
 
-수첩의 용의자 목록과 상세 화면에 새 정보를 알리는 느낌표가 있었는데, 원래는 고정 이미지라 내용을 다 확인해도 목록의 느낌표가 계속 남아 있었습니다.
-
-- 상세 화면 안의 느낌표는 그 항목을 누르거나 커서를 올리면 "확인"으로 기록하고 끔
-- 목록의 느낌표는 따로 켜고 끄지 않고, **그 캐릭터 상세에 아직 확인하지 않은(현재 보이는) 느낌표가 있는지로 계산** — 하위 상태에서 상위 표시를 파생시켜 둘이 어긋나지 않게 함
-- 확인 기록은 대화 시스템 변수(`NOTE.NOTICE_READ`)에 저장해 세이브/로드에 함께 들어감
-- 느낌표 스프라이트와 계층 경로로 대상을 찾아 런타임에 자동 부착 — 아티스트가 만든 프리팹은 수정하지 않음
-
-### 7-3. 알림 큐 — 아이템 알림과 퀘스트 알림의 우선순위
-
-아이템 획득·저장 알림은 즉시, 퀘스트 알림은 대화가 끝난 뒤에 보여야 해서 큐를 둘로 나눴습니다. 하나의 코루틴이 아이템 큐를 먼저 비우고, 퀘스트 알림은 대화 종료와 짧은 지연을 기다리되 그 사이 아이템 알림이 들어오면 즉시 양보합니다.
-
-<details class="code-fold">
-<summary>코드 보기 — NotificationManager.ProcessQueue (축약)</summary>
-
-```csharp
-private IEnumerator ProcessQueue()
-{
-    _isProcessing = true;
-    while (_itemQueue.Count > 0 || _questQueue.Count > 0)
-    {
-        while (_itemQueue.Count > 0)                 // 아이템·저장 알림은 즉시
-            yield return _itemQueue.Dequeue()();
-
-        if (_questQueue.Count == 0) continue;
-
-        while (DialogueManager.IsConversationActive) // 퀘스트 알림은 대화가 끝난 뒤
-        {
-            yield return null;
-            if (_itemQueue.Count > 0) break;         // 기다리는 중 아이템 알림이 오면 양보
-        }
-        if (_itemQueue.Count > 0) continue;
-
-        for (float t = 0f; t < afterDialogueDelay && _itemQueue.Count == 0; t += Time.deltaTime)
-            yield return null;
-        if (_itemQueue.Count > 0) continue;
-
-        yield return _questQueue.Dequeue()();
-    }
-    _isProcessing = false;
-}
-```
-
-</details>
-
-## 8. 퍼즐 · 기믹 설계
-
-장면마다 조작 방식이 다른 퍼즐과 기믹을 여러 종 만들었습니다. 스포일러를 피하기 위해 장면과 인물은 밝히지 않고, 구조 위주로 정리했습니다.
-
-### 8-1. 두 세계 전환 기믹 — 충돌 · 렌더링 · 레이캐스트 동기화
-
-**문제** — 같은 공간에 겹쳐 있는 두 버전의 세계(기본 / 숨겨진 세계)를 플레이어가 버튼 하나로 오가야 했습니다. 화면에서만 바꾸면 보이지 않는 세계의 벽에 부딪히거나, 보이지 않는 바닥을 밟고 서 있는 문제가 생깁니다.
-
-**해결** — 전환 한 번에 렌더링, 물리, 레이캐스트를 함께 바꾸는 `VisionWorldSwitcher`를 만들었습니다.
-
-- **렌더링** — 카메라 컬링 마스크에서 숨은 세계 레이어만 제외. 컷신 카메라 등 추가 카메라와, 카메라가 교체될 때(`RebindCamera`)도 같은 상태를 다시 적용
-- **물리** — 플레이어와 숨은 세계 레이어의 충돌을 끄고, 바꾸기 전 원래 충돌 설정을 저장해 두었다가 씬을 나갈 때 복원 (다른 씬의 충돌 매트릭스를 오염시키지 않음)
-- **CharacterController 대응** — 충돌 매트릭스 변경만으로는 이동 중 충돌이 끊기지 않는 경우가 있어, 숨은 세계의 콜라이더를 직접 비활성화하는 처리를 함께 적용
-- **레이캐스트** — 상호작용·지면 검사가 숨은 세계를 맞히지 않도록 현재 세계 기준 마스크(`ActiveRaycastMask`)를 공개하고, 전환 전후로 발밑 지면을 SphereCast로 검사해 로그를 남김
-- NavMesh·FMOD처럼 기능 때문에 레이어를 바꿀 수 없는 오브젝트, 라이트·볼륨은 따로 수집해 함께 전환
-
-<details class="code-fold">
-<summary>코드 보기 — VisionWorldSwitcher.Apply (발췌)</summary>
-
-```csharp
-private void Apply(bool on)
-{
-    IsVisionOn = on;
-    int showMask = on ? visionWorldLayers.value : normalWorldLayers.value;
-    int hideMask = on ? normalWorldLayers.value : visionWorldLayers.value;
-
-    // 1) 렌더링: 숨은 세계 레이어만 컬링 마스크에서 제외
-    ApplyCameraMask(targetCamera, showMask, hideMask);
-
-    // 2) 물리: 플레이어는 보이는 세계와만 충돌 (원래 값은 스냅샷 후 변경)
-    SetIgnoreBetweenMasks(playerLayers.value, showMask, false);
-    SetIgnoreBetweenMasks(playerLayers.value, hideMask, true);
-
-    // 2-1) CharacterController 대응: 숨은 세계 콜라이더를 직접 비활성화
-    SetAllColliderEnabled(normalWorldColliders, !on);
-    SetAllColliderEnabled(visionWorldColliders, on);
-
-    // 3) 레이캐스트: 숨은 세계만 제외한 마스크를 공개
-    ActiveRaycastMask = ~hideMask;
-
-    OnVisionChanged?.Invoke(on);
-}
-
-private void SetIgnoreBetweenMasks(int maskA, int maskB, bool ignore)
-{
-    for (int a = 0; a < 32; a++)
-    {
-        if ((maskA & (1 << a)) == 0) continue;
-        for (int b = 0; b < 32; b++)
-        {
-            if ((maskB & (1 << b)) == 0) continue;
-            int lo = Mathf.Min(a, b), hi = Mathf.Max(a, b);
-            int key = (lo << 8) | hi;
-            if (!savedIgnorePairs.ContainsKey(key)) // 최초 변경 시에만 원본 저장 → OnDestroy에서 복원
-                savedIgnorePairs.Add(key, Physics.GetIgnoreLayerCollision(lo, hi));
-            Physics.IgnoreLayerCollision(lo, hi, ignore);
-        }
-    }
-}
-```
-
-</details>
-
-<!-- GIF 자리: 두 세계 전환 장면 (5~10초, 스포일러 없는 구간) -->
-
-**아쉬운 점** — 레이어 충돌 매트릭스는 프로젝트 전역 설정이라 씬을 나갈 때 원래 값으로 복원하도록 만들었지만, 이 설정을 바꾸는 기믹이 늘어나면 서로 덮어쓸 수 있습니다. 그때는 충돌 설정 변경을 한 매니저가 소유하고, 요청을 모아 계산하는 방식으로 바꿔야 합니다.
-
-### 8-2. 중력 반전 이동 — 천장 걷기
-
-**문제** — 특정 구역에 들어가면 천장을 바닥처럼 걷는 기믹이 필요했습니다. 캐릭터 루트를 뒤집으면 CharacterController와 NavMesh 이동이 함께 깨집니다.
-
-**해결**
-
-- 이동 루트는 그대로 두고 **시각용 자식(그래픽)만 상하 반전**해, 충돌과 내비게이션에 영향이 없게 분리
-- 반전 구역에서는 중력 방향을 뒤집고, 위쪽으로 레이캐스트해 가장 가까운 천장 높이에 캐릭터를 붙이는 **천장 스냅** 적용
-- 발사 구역(`LaunchZone`)은 위로 쏘아 올린 직후 0.2초 동안 접지 보정을 건너뛰는 유예 시간을 두어, 바닥에 붙은 상태로 발사가 취소되지 않게 처리. 같은 진입에서 연속 발사되지 않도록 쿨다운 적용
-- 카메라를 180° 회전시켜 천장이 바닥처럼 보이게 하고, 좌우 입력도 화면 기준으로 맞게 반전
-- 문 이동 연출 중에는 구역 이탈 처리를 막아, 연출과 중력 상태가 엇갈리지 않게 함
-
-<details class="code-fold">
-<summary>코드 보기 — 천장 스냅 (발췌)</summary>
-
-```csharp
-private void SnapUnderCeiling()
-{
-    float topOffset = controller.center.y + controller.height * 0.5f;
-    Vector3 origin = transform.position + Vector3.up * Mathf.Max(0.01f, topOffset - 0.02f);
-
-    RaycastHit[] hits = Physics.RaycastAll(origin, Vector3.up, ceilingSnapMaxDistance,
-                                           ~0, QueryTriggerInteraction.Ignore);
-    float bestDist = float.MaxValue, bestY = 0f;
-    bool found = false;
-    foreach (var h in hits)
-    {
-        if (h.collider.transform.IsChildOf(transform)) continue; // 자기 자신 제외
-        if (h.distance < bestDist) { bestDist = h.distance; bestY = h.point.y; found = true; }
-    }
-    if (!found) return;
-
-    // 천장 바로 아래에 머리가 닿도록 위치 고정
-    float targetPivotY = bestY - topOffset - ceilingSnapOffset;
-    if (transform.position.y >= targetPivotY - ceilingSnapEngage)
-    {
-        var p = transform.position; p.y = targetPivotY; transform.position = p;
-        ySpeed = 0f;
-    }
-}
-```
-
-</details>
-
-<!-- GIF 자리: 발사 → 천장 착지 → 천장 걷기 (5~10초) -->
-
-### 8-3. 퍼즐 판정을 상태머신으로 — 정답 누락 · 중복 발생 수정
-
-**문제** — 같은 색의 점을 선으로 이어 모든 칸을 채우는 경로 퍼즐에서, 처음에는 **끝점에서 손을 뗀 순간에만** 정답을 검사했습니다. 마지막 연결을 끝점이 아닌 곳에서 마무리하면 정답이 잡히지 않았고, 정답 상태를 기억하지 않아 성공 이벤트가 여러 번 발생할 수 있었습니다.
-
-**해결** — 보드가 바뀔 때마다 판정하되, `Playing → Resolving → Solved` 상태머신으로 결과를 한 번만 처리하도록 바꿨습니다.
-
-- **입력은 보드가 모두 받음** — 칸마다 손 떼기(PointerUp) 이벤트를 달면 보드 밖에서 손을 뗐을 때 이벤트가 어디에도 도착하지 않아 "그리는 중" 상태가 남습니다. 누르기·드래그·떼기를 보드 하나가 받게 해, 손을 어디서 떼든 종료가 보장되게 했습니다
-- **역할 분리** — 보드(그리드·경로 상태·입력), 판정(정답·연출 훅), 선 그리기를 각각 다른 클래스로 나눔
-
-- 정답이면 즉시 보드를 잠그고, 마지막 선이 그려지는 연출 시간을 둔 뒤 성공 이벤트를 **1회만** 발생
-- 모든 쌍을 이었지만 빈칸이 남으면 오답 처리 후 자동 초기화. 단, **선을 그리는 도중에는 오답 판정을 하지 않음** — 마지막 쌍을 잇는 순간 손가락 밑에서 보드가 리셋되면 조작감이 망가지기 때문
-- 연출 중 `timeScale`이 0이 될 수 있어 대기는 `WaitForSecondsRealtime` 기준, 코루틴은 핸들로 개별 관리
-
-<details class="code-fold">
-<summary>코드 보기 — 퍼즐 판정 (발췌)</summary>
-
-```csharp
-public enum PuzzleState { Playing, Resolving, Solved }
-
-void OnBoardChanged()
-{
-    // Solved: 정답 1회 보장. Resolving: 리셋 대기 중에는 재판정하지 않음
-    if (_state != PuzzleState.Playing) return;
-    Evaluate();
-}
-
-public void Evaluate()
-{
-    if (_state != PuzzleState.Playing || board == null || !board.IsValid) return;
-
-    foreach (var color in board.ColorOrder)
-        if (!board.IsColorConnected(color)) return; // 아직 진행 중
-
-    if (requireAllCellsFilled && !board.AreAllCellsFilled())
-    {
-        if (board.IsDrawing) return; // 그리는 도중엔 오답 판정 보류 → 손을 떼면 다시 판정
-        HandleWrongAttempt();        // Resolving → 연출 후 자동 초기화
-        return;
-    }
-    Solve();                         // Solved → 보드 잠금 → 딜레이 후 성공 이벤트 1회
-}
-```
-
-</details>
-
-### 8-4. 드래그 앤 드롭 퍼즐 공통 구조
-
-아이템을 끌어 대상 위치에 사용하는 퍼즐 여러 종을 같은 구조로 만들었습니다.
-
-- 아이템마다 `Ready → Dragging → Resolving → Used` 상태를 두어, 판정 연출 중 입력과 재사용을 차단
-- **static 싱글톤 대신 매니저를 주입** — 한 씬에 같은 퍼즐 세트가 여러 벌 있어도 서로의 상태를 건드리지 않음
-- 부모의 `OnEnable`이 자식의 `Awake`보다 먼저 호출되는 경우를 대비해 지연 초기화
-- `StopAllCoroutines()`가 관련 없는 코루틴까지 멈추는 문제를 피하려고 코루틴 핸들을 직접 관리
-- 레이아웃 그룹의 직계 자식을 드래그하면 나머지가 재정렬되며 위치가 튀는 문제를, 중간에 슬롯 오브젝트를 두는 계층 구조로 해결
+**드래그 앤 드롭 퍼즐** — 아이템을 끌어 대상에 사용하는 퍼즐 여러 종을 공통 구조로 제작
 
 ## 전시 이력 — 30회 이상 · 5개국
 
