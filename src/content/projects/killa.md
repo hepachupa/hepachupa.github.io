@@ -1,6 +1,6 @@
 ---
 title: KILLA
-summary: 한국형 미스터리 어드벤처. 팀의 유일한 프로그래머로 게임의 모든 코드를 작성하고, TOEI Games 퍼블리싱 계약 이후 최적화·배포·QA까지 출시 과정을 맡았습니다. 국내외 수상·선정 12건.
+summary: 한국형 미스터리 어드벤처. 팀의 유일한 프로그래머로 게임의 모든 코드를 작성하고, TOEI Games 퍼블리싱 계약 이후 최적화·배포·QA까지 출시 과정을 맡았습니다. 국내외 수상·선정 13건.
 start: 2022-07-01
 end: 2026-10-20
 ongoing: true
@@ -503,7 +503,7 @@ private void OnLine(Subtitle subtitle)
 | 독일 | **gamescom 2024** Indie Arena Booth, ANIMAGIC |
 | 대만 | Taipei Game Show 2025 |
 | 미국 | LA COMIC-CON |
-| 국내 | G-STAR 2023 · 2024 인디 쇼케이스 |
+| 국내 | G-STAR 2023 · 2024 · 2026 |
 | | BIC 2023 · 2026 |
 | | 버닝비버 2023 · 2024 — 2년 연속 '올해의 버닝비버' |
 | | 플레이엑스포 2024, Unite Seoul 2026 |
