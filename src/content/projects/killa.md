@@ -104,8 +104,6 @@ links:
 - **사람 작업 보호** — 시작 시점에 이미 바뀌어 있던 파일은 커밋에서 자동 제외, `qa-auto/MMDD` 브랜치 → PR → 검토 후 병합
 - **파일 기반 요청/결과** — 빌드 중 MCP 호출이 타임아웃되므로 요청·진행 상태를 JSON 파일로 주고받고 폴링
 
-**결과** — 정기 실행 2회차 기준: 4행 중 2건 수정·빌드 2.8GB 업로드까지 515초, 20행 중 9건 수정·나머지 분류
-
 **아쉬운 점** — 에디터가 켜진 PC 한 대에 의존합니다. 규모가 커지면 빌드는 CI 서버(batchmode)로 옮기고 Claude는 분류·수정만 맡는 구조가 맞습니다.
 
 <details class="code-fold">
@@ -438,6 +436,8 @@ private void OnLine(Subtitle subtitle)
 ```
 
 </details>
+
+### 3-4. 그 밖의 툴 · 연동
 
 **사건 데이터 CSV 연동** — 수첩 사건 데이터(ScriptableObject)를 Excel용 CSV로 내보내고, 수정한 CSV를 Undo 가능한 형태로 다시 가져옵니다.
 
