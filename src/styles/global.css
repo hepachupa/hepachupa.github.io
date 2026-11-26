@@ -476,3 +476,18 @@ details.highlights.fold > ul { padding: 0 18px 14px 36px; }
 .toc li.has-sub > button .toc-t::after { content: '▸'; margin-left: 6px; font-size: 10px; opacity: .55; display: inline-block; transition: transform .15s; }
 .toc li.has-sub.open > button .toc-t::after { transform: rotate(90deg); }
 @media (max-width: 900px) { .toc li.d3.show { display: none; } .toc li.has-sub > button .toc-t::after { content: none; } }
+
+/* 전시 이력 — 국가 + 칩 */
+.prose .expo { margin: 14px 0 8px; }
+.prose .expo-r { display: grid; grid-template-columns: 56px 1fr; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); align-items: start; }
+.prose .expo-r:first-child { border-top: 0; }
+.prose .expo-k { font-weight: 700; padding-top: 4px; }
+.prose .expo-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.prose .expo .chip { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 3px 11px; font-size: 14px; line-height: 1.5; }
+.prose .expo .chip .y { margin-left: 4px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.prose .expo .chip.on { border-color: var(--accent); background: var(--accent-soft); }
+.prose .expo .chip.on b { color: var(--accent-text); }
+@media (max-width: 640px) {
+  .prose .expo-r { grid-template-columns: 1fr; gap: 6px; }
+  .prose .expo-k { padding-top: 0; font-size: 13px; color: var(--muted); }
+}
