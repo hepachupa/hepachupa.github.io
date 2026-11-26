@@ -32,43 +32,32 @@ links:
   - label: "기사: BIC 2026 토에이 게임즈 부스 출전 (인벤)"
     url: https://www.inven.co.kr/webzine/news/?news=319595
 ---
-## 개발 방식: AI를 개발 도구로 활용
 
-출시 준비 단계부터 Unity MCP로 Claude를 Unity 에디터에 직접 연결해 개발했습니다. 작업마다 AI에 맡길 일과 직접 판단할 일을 나누고, 결과를 따로 검증했습니다.
+*상용 프로젝트라 코드는 구조가 드러나는 부분만 발췌·축약해 접어 두었습니다.*
 
-| 작업 | Claude에게 맡긴 일 | 직접 판단한 일 | 검증 방법 |
-|---|---|---|---|
-| 회차 구조 개편 | 상태 변수 약 130개의 사용처 전수 조사, 점검 도구 제작 | 새 구조 설계(장소 기준 씬 재구성, 상태의 단일 원천) | 프레임 수 추측·생성 순서 의존 코드를 찾아 이벤트·실행 순서로 교체 |
-| 시작 시 멈춤 제거 | 원인 코드 분석, 개선안 비교, A/B 측정 도구 제작 | 멈춤을 옮기기만 하는 안을 버리고 미리 그린 이미지 방식 선택 | 같은 빌드에서 원본·개선 각 3회 측정, 픽셀 단위 결과 비교 |
-| 설치 용량 감축 | 빌드 리포트와 이미지 설정 교차 분석, 일괄 변환 도구 제작 | 그림이 바뀌는 안·메모리가 느는 안을 버리고 투명 여백 방식 선택 | 137장 시범 적용 → 전체 적용, 원본과 수치 비교 |
-| QA 자동화 | 시트 분류·수정·검증·빌드 절차 실행 | 번역·아트·사운드 제외 규칙, 애매한 행은 질문으로 남기는 기준 | 스모크 테스트 러너, PR 검토 후 병합 |
+## 1. AI를 활용한 개발
 
-**원칙** — 도구를 쓰며 발견한 한계(중복 메서드 오탐, 코드 실행 기능 미동작, 파일 해시 불일치 시 편집 실패)를 문서로 정리해 두었습니다. 규모가 큰 수정은 작성한 에이전트와 분리된 서브에이전트를 띄워 버그 가능성·기존 구조와의 일관성·성능 영향을 다시 검토하게 했고, 최종 반영 전에는 프로젝트의 다른 시스템과 같은 패턴인지 직접 확인했습니다.
+출시 준비 단계부터 Unity MCP로 Claude를 에디터에 연결해 개발했습니다. 조사·분석·반복 작업은 Claude에 맡기고, 구조 설계와 최종 판단은 직접 했습니다.
 
-**결과** — 반복적인 감사·리팩터링 작업은 AI에 맡기고, 구조 설계와 최종 검증에 시간을 집중할 수 있었습니다.
+- 도구의 한계(중복 메서드 오탐, 코드 실행 미동작, 해시 불일치 편집 실패)를 문서로 정리해 맡길 일의 기준으로 삼음
+- 큰 수정은 별도 서브에이전트로 버그·구조 일관성·성능을 다시 검토
+- AI의 분석도, 측정 도구의 숫자도 같은 조건에서 다시 재서 확인
 
-*각 항목의 코드는 접어 두었습니다. 퍼블리싱 중인 상용 프로젝트라 구조가 드러나는 부분만 발췌했으며, 스포일러가 될 수 있는 변수명과 씬 이름, 인스펙터 툴팁과 일부 필드·예외 처리는 제외하고 축약했습니다.*
+### 1-1. 회차 플레이 구조 개편 — 8개월
 
-## 1. 회차 플레이 구조 전면 개편 (8개월)
+**문제** — 회차 플레이가 기획 의도였지만, 실제 구현은 지나간 장면에 다시 오지 않는 단방향 구조였습니다. 상태가 30개 이상의 씬에 흩어져 있어 같은 장면을 다시 지나가면 어긋났습니다.
 
-**문제** — 기획 의도는 엔딩 후 처음부터 다시 플레이하는 회차 구조였지만, Claude로 프로젝트 전체의 상태 흐름을 조사한 결과 실제 구현은 한 번 지나간 장면에 다시 오지 않는다는 전제의 단방향 구조였습니다. 진행 상태가 30개 이상의 씬과 오브젝트에 분산되어 있어, 같은 장면을 다시 지나가면 상태가 어긋났습니다.
+**설계**
 
-**해결** — 약 130개 상태 변수의 사용처를 찾는 전수 조사와 점검 도구 제작은 Claude에 맡기고, 새 구조 설계와 최종 판단은 직접 담당했습니다.
+- 씬 30개 이상 → 장소 기준 약 15개로 재구성
+- 상태를 대화 시스템 전역 변수(`GLOBAL.XXX`) 한곳으로 통합 — 대사 분기·세이브·QA가 같은 값을 읽음
+- 스토리 단계와 **같은 이름의 오브젝트 묶음만 켜는** 레이어 구조(`StoryLayerController`), 조건부 경로를 순서대로 검사하는 문 이동(`PortalStoryRouter`)
+- 레이어 적용을 "3프레임 대기 후"에서 세이브 **복원 완료 이벤트** 기준으로 바꿔, 복원이 늦은 씬에서 잘못된 레이어가 켜지던 문제 제거
+- 안정화 — 전역 매니저 14종 감사(중복 생성 가드·실행 순서), 세이브/로드 개편(슬롯 불일치·씬 전환 중 저장 타이밍·NPC 위치 복원)
 
-- 30개 이상의 씬을 장소 기준 약 15개로 재구성
-- 흩어진 상태 변수를 대화 시스템의 전역 변수(`GLOBAL.XXX`)로 통합 — 대사 분기·세이브·QA 프리셋이 모두 같은 변수를 읽도록, Lua 변수와 세이브 시스템을 함께 제공하는 PixelCrushers Dialogue System을 상태의 단일 원천으로 정함
-- 스토리 단계에 따라 오브젝트를 전환하는 레이어 구조(`StoryLayerController`), 세이브 시스템, ScriptableObject 데이터를 새로 설계
-- AI가 작성한 코드 중 프레임 수로 타이밍을 추측하거나 매니저 생성 순서에 의존하는 부분은 복원 완료 이벤트와 명시적 실행 순서로 교체
+**AI 분담** — Claude: 상태 변수 약 130개 사용처 전수 조사<br>나: 새 구조 설계<br>검증: 프레임 수 추측·생성 순서 의존 코드를 찾아 복원 완료 이벤트와 실행 순서로 교체
 
-**결과** — 2022년부터 개발해 온 프로젝트를 8개월 만에 회차 플레이 구조로 전면 개편했습니다.
-
-**아쉬운 점** — 처음부터 진행 상태를 한곳에 모으는 것을 전제로 설계했다면 8개월짜리 개편은 필요 없었습니다. 이후로는 새 기능을 만들 때 "상태를 어디에 저장하고, 같은 장면을 다시 지나갈 때 어떻게 복원되는가"부터 정합니다.
-
-### 1-1. 코드: 스토리 단계를 데이터로 관리 — `StoryLayerController`
-
-씬마다 조건문을 분산하는 대신, 스토리 단계 이름과 **같은 이름의 오브젝트 묶음만 활성화하는** 방식으로 분기를 단순화했습니다. 시나리오가 늘어도 씬에 레이어 오브젝트만 추가하면 되며, 코드는 수정할 필요가 없습니다.
-
-**개선 이력:** 초기 구현은 세이브 복원이 끝났을 것이라 가정하고 **3프레임을 대기한 뒤** 적용했습니다. 복원이 늦어지는 씬에서는 잘못된 레이어가 활성화될 수 있는 구조였습니다. 현재는 세이브 시스템의 **복원 완료 이벤트(`saveDataApplied`)에 맞춰 적용**하고, 세이브를 거치지 않는 로드에만 폴백으로 대기하도록 변경했습니다. 같은 프로젝트의 스폰 처리와 같은 패턴으로 맞췄고, 단계 이름에 맞는 레이어가 없으면 경고를 출력해 데이터 오타를 즉시 발견할 수 있게 했습니다. 직렬화 필드와 공개 메서드는 유지해 기존 씬과 호출부를 수정할 필요가 없습니다.
+**아쉬운 점** — 처음부터 상태를 한곳에 모았다면 필요 없던 개편입니다. 이후 새 기능은 "어디에 저장되고 다시 지나갈 때 어떻게 복원되는가"부터 정합니다.
 
 <details class="code-fold">
 <summary>코드 보기 — StoryLayerController</summary>
@@ -121,10 +110,6 @@ public class StoryLayerController : MonoBehaviour
 
 </details>
 
-### 1-2. 코드: 조건부 씬 이동 — `PortalStoryRouter`
-
-같은 문이라도 스토리 단계, 퀘스트 상태, 변수에 따라 다른 목적지로 이동시켜야 했습니다. **조건이 있는 경로는 배열 순서대로 우선 검사**하고, 하나도 맞지 않으면 **조건 없는 기본 경로**로 이동하도록 설계해, 기획자가 인스펙터에서 경로를 추가하는 것만으로 분기를 만들 수 있게 했습니다. 분기를 추가할 때 기획자가 프로그래머를 기다리지 않아도 됩니다.
-
 <details class="code-fold">
 <summary>코드 보기 — PortalStoryRouter</summary>
 
@@ -170,24 +155,125 @@ private static bool ConditionMet(Route r)
 
 </details>
 
+### 1-2. 시작 시 멈춤 제거 — 352ms → 0ms
+
+**문제** — 시작할 때 화면이 약 4초간 검게 멈췄습니다. 후처리 플러그인(VolFx)이 실행할 때마다 2048×2048 노이즈 이미지를 새로 그리고 있었습니다.
+
+**설계** — 노이즈를 미리 베이크해 불러오도록 바꿨습니다. 쓰는 값이 한 채널뿐이라 RGBA32(16MB) 대신 R8(4MB)로 저장하고, Read/Write를 꺼 CPU 쪽 사본도 없앴습니다.
+
+**AI 분담** — Claude: 원인 분석·대안 비교·A/B 측정 도구 제작<br>나: 생성 시점만 늦추는 안(멈춤이 옮겨갈 뿐)을 버리고 베이크 방식 선택<br>검증: 같은 빌드에서 각 3회 측정, 픽셀 단위 결과 비교
+
+| 지표 | 원본 | 개선 |
+|---|---|---|
+| 노이즈 생성 | 352ms | 0ms |
+| 시작 직후 두 번째 프레임 | 766ms | 425ms (−44%) |
+| 노이즈 이미지 메모리 | 16MB | 4MB (−75%) |
+
+*i7-13700F / RTX 5060, Development 빌드 기준. Release 빌드·저사양 PC는 다시 측정하지 않음*
+
+**발견** — Deep Profiling이 켜져 있으면 작은 함수를 많이 부르는 코드가 실제보다 크게 측정됩니다(같은 코드 352ms vs 3,227ms). 첫 측정의 "4초"는 이 왜곡이었습니다.
+
+<details class="code-fold">
+<summary>시각 자료 보기 — Profiler 전후 비교</summary>
+
+<img src="/images/killa-perf-timeline.webp" alt="시작 직후 두 번째 프레임 Profiler Timeline 전후 비교" loading="lazy" decoding="async" />
+
+<img src="/images/killa-perf-hierarchy.webp" alt="시작 직후 두 번째 프레임 Profiler Hierarchy 전후 비교" loading="lazy" decoding="async" />
+
+*같은 빌드의 원본(위)과 개선(아래)을 Profiler로 캡처한 시작 직후 두 번째 프레임 — 노이즈 생성 구간(352ms)이 사라짐*
+
+</details>
+
+### 1-3. 설치 용량 감축 — 6.4GB → 4.7GB (−27%)
+
+**문제** — 압축 설정을 해 둔 이미지가 압축되지 않아 빌드가 6.4GB였습니다. 원인은 크기가 4의 배수가 아닌 이미지(BC7은 4×4 블록 단위로 압축)였습니다.
+
+**설계** — 가장자리에 투명 여백을 붙여 크기만 맞추고 화면 위치는 유지했습니다. 아티스트가 원본을 다시 작업할 필요가 없습니다.
+
+**AI 분담** — Claude: 빌드 리포트·이미지 설정 교차 분석, 일괄 변환 도구 제작<br>나: 그림이 바뀌는 축소안·메모리가 느는 아틀라스안 대신 여백 방식 선택<br>검증: 백업·137장 시범 적용 후 1,645장 전체 적용
+
+| 항목 | 이전 | 이후 |
+|---|---|---|
+| 빌드 전체 | 6,418MB | 4,675MB (−27%) |
+| 이미지 | 5,151MB | 3,933MB |
+| 영상 17개 | 873MB | 349MB (−60%) |
+
+**아쉬운 점** — 일괄 변환이라 새 이미지가 같은 문제를 다시 만들 수 있습니다. 임포트 시 크기를 검사하는 `AssetPostprocessor`가 재발을 막는 방법입니다.
+
+<details class="code-fold">
+<summary>시각 자료 보기 — 원본 · 압축 결과 비교</summary>
+
+<img src="/images/killa-bc7-compare.webp" alt="원본, 압축 결과, 차이 8배 확대 비교" loading="lazy" decoding="async" />
+
+*왼쪽부터 원본 · 압축 결과 · 차이를 8배 확대한 이미지 — 차이가 거의 보이지 않음*
+
+</details>
+
+### 1-4. QA 자동화 — 시트 → 수정 → 검증 → 빌드 → 업로드
+
+**문제** — 분기 서사라 버그 하나를 재현하려면 앞 대사를 모두 진행해야 했고, QA 시트로 수십 건씩 들어오는 버그를 분류·수정·빌드·공유까지 손으로 반복했습니다.
+
+<figure class="flow"><svg viewBox="0 0 910 268" role="img" aria-label="QA 자동화 흐름: QA 시트 새 행부터 시트에 결과 기록까지" style="width:100%;height:auto;font-family:inherit"><rect x="20" y="46" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="95.0" y="69" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">QA 시트</text><text x="95.0" y="88" text-anchor="middle" font-size="12" style="fill:var(--muted)">새 행 추가</text><rect x="200" y="46" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="275.0" y="69" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">감지</text><text x="275.0" y="88" text-anchor="middle" font-size="12" style="fill:var(--muted)">3시간 수정 없음</text><line x1="173" y1="74.0" x2="197" y2="74.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="197.0,74.0 189.0,69.0 189.0,79.0" style="fill:var(--muted)"/><rect x="380" y="46" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="455.0" y="69" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">Preflight</text><text x="455.0" y="88" text-anchor="middle" font-size="12" style="fill:var(--muted)">플레이·컴파일·씬·git</text><line x1="353" y1="74.0" x2="377" y2="74.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="377.0,74.0 369.0,69.0 369.0,79.0" style="fill:var(--muted)"/><rect x="560" y="46" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="635.0" y="69" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">브랜치</text><text x="635.0" y="88" text-anchor="middle" font-size="12" style="fill:var(--muted)">qa-auto/MMDD</text><line x1="533" y1="74.0" x2="557" y2="74.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="557.0,74.0 549.0,69.0 549.0,79.0" style="fill:var(--muted)"/><rect x="740" y="46" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--accent)" stroke-width="2"/><text x="815.0" y="69" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">분류 · 수정</text><text x="815.0" y="88" text-anchor="middle" font-size="12" style="fill:var(--muted)">Claude + Unity MCP</text><line x1="713" y1="74.0" x2="737" y2="74.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="737.0,74.0 729.0,69.0 729.0,79.0" style="fill:var(--muted)"/><rect x="740" y="176" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="815.0" y="199" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">스모크 검증</text><text x="815.0" y="218" text-anchor="middle" font-size="12" style="fill:var(--muted)">QASmokeRunner</text><rect x="560" y="176" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--accent)" stroke-width="2"/><text x="635.0" y="199" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">커밋 · PR</text><text x="635.0" y="218" text-anchor="middle" font-size="12" style="fill:var(--muted)">작업 중 파일 제외</text><line x1="737" y1="204.0" x2="713" y2="204.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="713.0,204.0 721.0,209.0 721.0,199.0" style="fill:var(--muted)"/><rect x="380" y="176" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="455.0" y="199" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">빌드 · zip</text><text x="455.0" y="218" text-anchor="middle" font-size="12" style="fill:var(--muted)">build_result.json</text><line x1="557" y1="204.0" x2="533" y2="204.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="533.0,204.0 541.0,209.0 541.0,199.0" style="fill:var(--muted)"/><rect x="200" y="176" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="275.0" y="199" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">Drive 업로드</text><text x="275.0" y="218" text-anchor="middle" font-size="12" style="fill:var(--muted)">동기화 폴더</text><line x1="377" y1="204.0" x2="353" y2="204.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="353.0,204.0 361.0,209.0 361.0,199.0" style="fill:var(--muted)"/><rect x="20" y="176" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="95.0" y="199" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">시트에 기록</text><text x="95.0" y="218" text-anchor="middle" font-size="12" style="fill:var(--muted)">결과 · 원인 · 링크</text><line x1="197" y1="204.0" x2="173" y2="204.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="173.0,204.0 181.0,209.0 181.0,199.0" style="fill:var(--muted)"/><line x1="815.0" y1="105" x2="815.0" y2="173" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="815.0,173.0 820.0,165.0 810.0,165.0" style="fill:var(--muted)"/><text x="890" y="32" text-anchor="end" font-size="12" style="fill:var(--accent-text)">애매하면 고치지 않고 "확인 필요" + 질문</text><text x="635.0" y="254" text-anchor="middle" font-size="12" style="fill:var(--accent-text)">사람이 검토 후 병합</text></svg><figcaption>매일 정기 실행되는 QA 흐름 — 주황 테두리는 사람이 판단하는 지점</figcaption></figure>
+
+**설계**
+
+- **스모크 테스트 러너**(`QASmokeRunner`) — 메뉴 하나로 엔딩 판정·포탈 조건·모든 씬 레이어·실제 대사 진행을 검사하고 리포트를 남김
+- **판단 기준을 규칙으로** — 번역·아트·사운드는 건드리지 않고, 애매한 행은 고치지 않고 질문으로 남김
+- **사람 작업 보호** — 시작 시점에 이미 바뀌어 있던 파일은 커밋에서 자동 제외, `qa-auto/MMDD` 브랜치 → PR → 검토 후 병합
+- **파일 기반 요청/결과** — 빌드 중 MCP 호출이 타임아웃되므로 요청·진행 상태를 JSON 파일로 주고받고 폴링
+
+**결과** — 정기 실행 2회차 기준: 4행 중 2건 수정·빌드 2.8GB 업로드까지 515초, 20행 중 9건 수정·나머지 분류
+
+**아쉬운 점** — 에디터가 켜진 PC 한 대에 의존합니다. 규모가 커지면 빌드는 CI 서버(batchmode)로 옮기고 Claude는 분류·수정만 맡는 구조가 맞습니다.
+
+<details class="code-fold">
+<summary>코드 보기 — QAAutoBuild.GitCommit (사람의 작업 파일 제외)</summary>
+
+```csharp
+public static void GitCommit()
+{
+    AssetDatabase.SaveAssets();
+    var req = ReadJson<GitReq>("git_req.json");
+    var res = new GitResult { time = Now, action = "commit" };
+
+    // Preflight 시점에 이미 바뀌어 있던 파일 = 사람이 작업 중이던 파일 → 커밋 제외
+    var userDirty = new HashSet<string>();
+    string pre = AutoFile("preflight_git_dirty.txt");
+    if (File.Exists(pre))
+        foreach (var l in File.ReadAllLines(pre, Encoding.UTF8)) if (l.Length > 0) userDirty.Add(l);
+
+    string[] skipPrefix = { "Builds/", "Library/", "Temp/", "Logs/", "UserSettings/", "obj/" };
+    var mine = GitDirtyPaths().Where(p => !userDirty.Contains(p) && !p.Contains("_QAReports~")
+                     && !skipPrefix.Any(x => p.StartsWith(x, StringComparison.OrdinalIgnoreCase))).ToList();
+    if (mine.Count == 0) { res.ok = true; res.output = "커밋할 변경 없음"; WriteJson("git_result.json", res); return; }
+
+    File.WriteAllText(AutoFile("commit_paths.txt"), string.Join("\n", mine) + "\n", new UTF8Encoding(false));
+    int code = Git($"add -A --pathspec-from-file=\"{AutoFile("commit_paths.txt")}\"", out var o1);
+    // ... 커밋 메시지 파일로 commit, 결과(브랜치·해시·파일 목록)를 git_result.json 에 기록
+}
+```
+
+</details>
+
 ## 2. 콘텐츠 시스템 설계 — 되돌릴 상태와 남길 상태
 
-회차 플레이 게임이라 "세이브를 불러오면 되돌아가야 하는 상태"와 "세이브와 상관없이 쌓여야 하는 상태"가 섞여 있었습니다. 둘을 저장소부터 나누고, 다른 값에서 계산할 수 있는 값은 저장하지 않는다는 원칙으로 콘텐츠 시스템을 만들었습니다.
+회차 게임이라 "세이브를 불러오면 되돌아갈 상태"와 "계속 쌓일 상태"를 저장소부터 나누고, 계산할 수 있는 값은 저장하지 않았습니다.
 
 | 구분 | 저장 위치 | 예 |
 |---|---|---|
-| 되돌릴 상태 | 세이브 슬롯 (대화 시스템 Lua 변수) | 스토리 단계, 퀘스트, 호감도, 남은 목숨 |
-| 남길 상태 | 영구 프로필 `profile.json` (`PlayerProfile`) | 엔딩 수집, 데드씬 수집, 게임오버 기록, 누적 플레이타임, 업적(구조만 마련) |
-| 저장하지 않는 값 | 매번 계산 | 하루 남은 행동력 = 하루 한도 − 오늘 대화한 NPC 수 |
+| 되돌릴 상태 | 세이브 슬롯 (대화 시스템 변수) | 스토리 단계, 퀘스트, 호감도, 남은 목숨 |
+| 남길 상태 | 영구 프로필 `profile.json` | 엔딩·데드씬 수집, 게임오버 기록, 플레이타임 |
+| 저장하지 않는 값 | 매번 계산 | 하루 남은 행동력 = 한도 − 오늘 대화한 NPC 수 |
 
 ### 2-1. 게임오버 → 히든 엔딩 — `GameOverService`
 
-**설계** — 콘텐츠마다 목숨을 따로 두고, 목숨을 모두 잃으면 게임오버 화면(콘텐츠별 일러스트·제목·날짜·플레이타임)을 거쳐 게임오버 씬으로 이동합니다. 게임오버 횟수가 기준을 넘으면 같은 흐름이 히든 엔딩으로 이어집니다. 실패를 그대로 끝내지 않고 회차 진행의 일부로 만드는 구조입니다.
+콘텐츠마다 목숨을 두고, 게임오버 횟수가 기준을 넘으면 같은 흐름이 히든 엔딩으로 이어집니다.
 
-- **기록 먼저, 연출은 나중** — 기록을 연출 전에 영구 프로필에 저장해, 연출 도중 게임을 꺼도 횟수가 빠지지 않음
-- **세이브와 분리** — 게임오버 기록은 세이브 슬롯이 아니라 프로필에 누적되므로, 직전 세이브를 불러와도 횟수가 유지되어 히든 엔딩 조건이 되돌아가지 않음
-- **조건은 데이터로** — 히든 엔딩 기준(횟수, 총 횟수/콘텐츠 종류 수 중 무엇을 셀지)을 카탈로그 ScriptableObject에서 지정. 카탈로그에 등록되지 않은 ID로 요청하면 게임오버 자체를 취소해, 데이터 누락이 조용히 지나가지 않게 함
-- **대화와의 연결** — 대화 조건에서 `GameOverCount()` 같은 Lua 함수로 기록을 읽어 대사를 분기. 대화 스크립트에서 게임오버를 요청하면 한 프레임 미뤄 실행해, 대화 종료 처리와 겹쳐 재진입이 일어나지 않게 함
+- **기록 먼저** — 연출 전에 프로필에 저장해 도중에 꺼도 횟수 유지
+- **세이브와 분리** — 직전 세이브를 불러와도 히든 엔딩 조건이 되돌아가지 않음
+- **조건은 데이터로** — 기준(총 횟수 / 콘텐츠 종류 수)은 카탈로그 ScriptableObject에서 지정, 등록 안 된 ID는 요청 자체를 거부
+
+**아쉬운 점** — 프로필을 바로 덮어써서 저장 중 꺼지면 기록이 사라질 수 있습니다. 임시 파일 교체 + 백업, 버전 필드가 출시 전에 필요합니다.
 
 <details class="code-fold">
 <summary>코드 보기 — GameOverService.RequestInternal (발췌)</summary>
@@ -228,214 +314,11 @@ public bool IsHiddenEndingConditionMet()
 
 </details>
 
-### 2-2. 하루 행동력 — 저장하지 않고 계산
+## 3. 개발 툴
 
-하루에 대화할 수 있는 NPC 수에 한도가 있는 구조입니다. 남은 행동력을 별도 변수로 저장하면 대화 기록과 행동력 두 값이 생기고, 세이브·로드나 대화 스킵 경로에서 둘이 어긋날 수 있습니다. 그래서 남은 행동력은 저장하지 않고 **"오늘 대화한 NPC 수"에서 매번 계산**하도록 해, 어긋날 수 있는 상태 자체를 없앴습니다. 호감도도 NPC별 대화 시스템 전역 변수에 두어 세이브와 대화 분기가 같은 값을 읽습니다.
+### 3-1. 엔딩 분기 QA 툴
 
-**아쉬운 점** — 영구 프로필은 JSON 파일 하나를 바로 덮어쓰는 방식이라, 저장 중 전원이 꺼져 파일이 깨지면 기본값으로 새로 만들면서 수집 기록이 사라질 수 있습니다. 임시 파일에 먼저 쓴 뒤 교체하고 이전 파일을 백업으로 남기는 방식, 그리고 구조가 바뀌어도 이전 파일을 읽을 수 있도록 버전 필드를 두는 처리가 출시 전에 필요합니다.
-
-## 3. 최적화
-
-### 3-1. 씬 최적화 감사 툴
-
-**문제** — 장소(LOC) 씬이 늘어나면서 씬마다 불필요한 컴포넌트, 중복 라이트·볼륨, 미사용 오브젝트가 쌓였고, 수작업으로 확인하기에는 씬 수가 많았습니다.
-
-**해결** — 씬을 자동으로 검사해 문제 항목을 리포트하는 에디터 툴 `SceneOptimAudit`을 만들고, 여러 LOC 씬에 일괄 최적화 패스를 진행했습니다. 구버전 Post Processing Stack v2 설정은 URP Volume Profile로 이관했습니다.
-
-**결과** — 최적화 대상을 사람의 감이 아니라 리포트 기준으로 관리하게 되었습니다.
-
-### 3-2. 시작 시 멈춤 제거 — 노이즈 생성 352ms → 0ms
-
-**문제** — 게임을 시작하면 로딩 중 화면이 약 4초간 검게 보이는 현상이 있었습니다. Profiler로 측정하자 그 구간에서 후처리 플러그인(VolFx)이 시작할 때마다 노이즈 이미지를 매번 새로 그리는 작업이 가장 큰 비중을 차지하는 것으로 나타났습니다.
-
-**해결** — Claude에게 원인 코드 분석과 개선안 비교를 맡겼습니다. 대안 중 생성 시점만 늦추는 방법은 멈춤이 다른 장면으로 옮겨갈 뿐이라 버리고, 미리 그려 둔 이미지를 불러오는 방법을 선택했습니다.
-
-**검증** — 개선 폭을 숫자로 확인하기 위해, 같은 빌드에서 원본과 개선을 번갈아 실행하는 A/B 측정 도구를 만들게 하고 각 3회 측정했습니다. 화면 결과가 원본과 같은지도 픽셀 단위로 비교하게 했습니다.
-
-| 지표 | 원본 | 개선 | 차이 |
-|---|---|---|---|
-| 노이즈 생성 시간 | 352ms | 0ms | 제거 |
-| 시작 직후 두 번째 프레임 | 766ms | 425ms | −44% |
-| 노이즈 이미지 메모리 | 16MB | 4MB | −75% |
-
-*i7-13700F / RTX 5060, Development 빌드, 1920×1080 기준. 출시(Release) 빌드와 저사양 PC에서는 다시 측정하지 않아 수치가 다를 수 있습니다.*
-
-**메모리** — 노이즈는 2048×2048 크기라, 원본처럼 RGBA32(픽셀당 4바이트)로 만들면 16MB입니다. 실제로 쓰는 값은 한 채널뿐이라 R8(픽셀당 1바이트)로 베이크해 4MB로 줄였고, 결과가 원본의 R 채널과 같은지 검증했습니다. 텍스처의 Read/Write도 꺼서 빌드에 CPU 쪽 사본(4MB)이 남지 않게 했습니다.
-
-<details class="code-fold">
-<summary>시각 자료 보기 — Profiler 전후 비교</summary>
-
-<img src="/images/killa-perf-timeline.webp" alt="시작 직후 두 번째 프레임 Profiler Timeline 전후 비교" loading="lazy" decoding="async" />
-
-<img src="/images/killa-perf-hierarchy.webp" alt="시작 직후 두 번째 프레임 Profiler Hierarchy 전후 비교" loading="lazy" decoding="async" />
-
-*같은 빌드의 원본(위)과 개선(아래)을 Profiler로 캡처한 시작 직후 두 번째 프레임 — 노이즈 생성 구간(352ms)이 사라짐*
-
-</details>
-
-**발견** — 처음 측정에서는 노이즈 생성 하나가 약 4초를 차지하는 것처럼 보였지만, 실제 비용은 352ms였습니다. 상세 측정 모드(Deep Profiling)가 켜져 있으면 작은 함수를 많이 부르는 코드일수록 실제보다 훨씬 느리게 측정되기 때문입니다(같은 코드가 352ms vs 3,227ms). AI의 분석도, 측정 도구의 숫자도 그대로 믿지 않고 같은 조건에서 다시 재는 원칙을 이 과정에서 세웠습니다.
-
-### 3-3. 설치 용량 감축 — 6.4GB → 4.7GB (−27%)
-
-**문제** — 출시용 빌드가 6.4GB였고, 대부분이 압축되지 않은 이미지였습니다. 압축 설정을 해 두었는데도 용량이 줄지 않고 있었습니다.
-
-**해결** — "압축 설정인데 왜 압축이 안 됐는가"를 질문으로 정하고, Claude에게 빌드 리포트와 이미지 설정의 교차 분석을 맡겼습니다. 원인은 이미지 크기가 4의 배수가 아니면 압축이 적용되지 않는 엔진 규칙이었고(BC7 같은 블록 압축은 4×4 픽셀 블록 단위로 저장하기 때문), 아티스트가 그린 크기를 그대로 쓴 이미지 대부분이 여기에 해당했습니다. AI가 제시한 방법 중 이미지 크기를 줄이는 방법은 그림이 미세하게 바뀌어 버렸고, 여러 이미지를 하나로 묶는 방법은 저사양 PC의 메모리가 늘 수 있어 택하지 않았습니다. 대신 가장자리에 투명 여백을 붙여 크기만 맞추고 화면 위치는 그대로 유지해, 아티스트가 원본을 다시 작업할 필요가 없도록 하였습니다.
-
-**검증** — 1,600여 장을 한꺼번에 바꾸는 작업이라, 자동 처리 도구에 백업·시범 적용(137장)·되돌리기 기능을 먼저 갖추게 한 뒤 전체에 적용했습니다. 결과는 원본과 수치로 비교해 눈으로 구분하기 어려운 수준인지 확인했고, 영상 17개도 화질을 유지하는 선에서 다시 인코딩했습니다.
-
-**아쉬운 점** — 이번 변환은 일괄 도구로 한 번에 처리했기 때문에, 이후 새로 들어오는 이미지가 같은 문제를 다시 만들 수 있습니다. 임포트 단계에서 크기를 검사해 경고하는 `AssetPostprocessor`를 두는 편이 재발을 막는 방법입니다.
-
-| 항목 | 이전 | 이후 | 차이 |
-|---|---|---|---|
-| 출시용 빌드 전체 | 6,418MB | 4,675MB | −27% |
-| 이미지 | 5,151MB | 3,933MB | −1,218MB |
-| 영상 | 873MB | 349MB | −60% |
-
-<details class="code-fold">
-<summary>시각 자료 보기 — 원본 · 압축 결과 비교</summary>
-
-<img src="/images/killa-bc7-compare.webp" alt="원본, 압축 결과, 차이 8배 확대 비교" loading="lazy" decoding="async" />
-
-*왼쪽부터 원본 · 압축 결과 · 차이를 8배 확대한 이미지 — 차이가 거의 보이지 않음*
-
-</details>
-
-## 4. 배포 · 빌드 파이프라인
-
-**문제** — 전시용, QA용, 출시용 빌드마다 시작 지점과 설정이 달라 매번 수동으로 변경해야 했고, 작은 실수가 빌드 사고로 이어졌습니다.
-
-**해결** — `BuildConfig`로 Normal / GameShow / QA 세 가지 빌드 모드를 분리하고, `StartPoint`(씬 + 스토리 레이어 + 스폰 위치 + 날짜 + 초기 Lua)로 어느 지점에서든 시작할 수 있게 했습니다. 전시 빌드에는 무인 운영(`AttractController`, `ExpoIdleWatcher`)과 요약 씬을, 출시 빌드에는 Steamworks 연동을 넣었습니다.
-
-**결과** — 빌드 종류를 설정만으로 전환할 수 있게 되어 BIC 등 전시와 QA 빌드를 코드 수정 없이 내보냈고, 전시·퍼블리셔 일정에 맞춰 팀이 빌드를 기다리지 않게 되었습니다.
-
-### 4-1. 코드: 어디서든 시작하는 빌드 — `BuildConfig.StartPoint`
-
-전시·QA 빌드를 코드 수정 없이 만들기 위해, "어디서부터 시작할지"를 **씬 + 스토리 단계 + 스폰 위치 + 날짜 + 초기 Lua**의 데이터 묶음으로 정의했습니다. ScriptableObject 하나로 Normal / GameShow / QA 모드를 전환합니다.
-
-<details class="code-fold">
-<summary>코드 보기 — BuildConfig.StartPoint</summary>
-
-```csharp
-[CreateAssetMenu(fileName = "BuildConfig", menuName = "Game/Build Config")]
-public class BuildConfig : ScriptableObject
-{
-    public enum BuildMode { Normal = 0, GameShow = 1, QA = 2 }
-
-    [Serializable]
-    public class StartPoint
-    {
-        public string sceneName;   // 로드할 씬
-        public string storyStep;   // 활성화할 스토리 레이어 이름
-        public string spawnId;     // 스폰 포인트 이름
-        public bool overrideDay = true;
-        [Min(0)] public int day = 0;
-        [TextArea(2, 8)] public string seedLua; // 퀘스트·플래그·아이템 초기 상태
-
-        public bool IsValid => !string.IsNullOrEmpty(sceneName);
-    }
-
-    [SerializeField] private BuildMode mode = BuildMode.Normal;
-    [SerializeField] private StartPoint gameShowStart = new StartPoint();
-    [SerializeField, Range(30f, 600f)] private float idleTimeoutSeconds = 300f; // 전시장 무입력 시 복귀
-
-    public bool IsGameShowMode => mode == BuildMode.GameShow;
-    public bool IsQAMode => mode == BuildMode.QA;
-    public StartPoint GameShowStart => gameShowStart;
-}
-```
-
-</details>
-
-## 5. QA 자동화 · 안정화
-
-**문제** — 분기 서사 게임이라 버그 하나를 재현하려면 앞부분 대사를 모두 진행해야 했습니다. 출시 준비 단계에서는 QA 시트로 버그가 한 번에 수십 건씩 들어왔고, 분류 → 수정 → 검증 → 빌드 → 공유를 매번 손으로 반복했습니다.
-
-**해결** — 사람이 하던 QA 흐름을 세 단계로 자동화하고, 각 단계에 사람이 판단할 지점을 남겼습니다.
-
-| 단계 | 하는 일 | 사람이 남는 지점 |
-|---|---|---|
-| ① 스모크 테스트 러너 | 메뉴 하나로 Play 진입 → 지정 지점 점프·대사 진행 → 리포트 → 종료 | 리포트의 FAIL/WARN 판단 |
-| ② QA 시트 처리 | 시트 행 분류 → Unity에서 수정 → 러너로 검증 → 시트에 결과·원인 기록 | 판단이 애매한 행은 "확인 필요" + 질문 |
-| ③ 매일 정기 실행 | 새 행 감지 → 브랜치 → 수정 → 커밋 → 빌드 → Drive 업로드 → 시트에 링크 | PR 검토 후 병합 |
-
-### 5-1. 스모크 테스트 러너 — `QASmokeRunner`
-
-에디터 메뉴(`KILLA > QA > Smoke Test`)를 누르면 Bootstrap 씬을 거쳐 전역 매니저 준비를 기다린 뒤, 모드별 테스트를 돌리고 Markdown 리포트를 남기고 Play를 종료합니다.
-
-- **Endings / Gates** — 변수 조합마다 기대한 엔딩이 판정되는지, 포탈 조건이 맞게 열리고 닫히는지 씬 로드 없이 검사
-- **Presets** — Day 시작점과 엔딩 경로 프리셋 지점으로 실제 점프해 씬·스토리 단계·레이어·스폰 위치·에러 로그 검증
-- **AllLayers** — 빌드에 포함된 모든 장소 씬을 로드하고 스토리 레이어를 하나씩 켜며 에러와 데이터 누락(없는 변수·퀘스트 참조) 검출
-- **Flow** — 실제로 대사를 진행하고 UI를 클릭하며 진행 멈춤(시간 초과), 화면을 덮은 검은 이미지, 플레이어와 바닥 사이 간격, 활성 카메라를 기록하고 단계마다 스크린샷 저장
-- 에디터가 포커스를 잃으면 Play 루프가 멈추기 때문에, 테스트 동안에만 `runInBackground`와 에디터 Interaction Mode를 바꾸고 원래 값은 저장해 두었다가 종료 시 복원
-
-### 5-2. QA 시트 → 자동 수정 · 빌드 · 업로드
-
-Claude가 Unity MCP로 에디터를 조작해 QA 시트를 처리하는 절차를 **스킬과 런북 문서**로 고정하고, 매일 정해진 시각에 정기 작업으로 실행되게 했습니다. 에디터 쪽에는 그 작업이 호출할 메뉴(`QAAutoBuild`)를 만들었습니다.
-
-<figure class="flow"><svg viewBox="0 0 910 268" role="img" aria-label="QA 자동화 흐름: QA 시트 새 행부터 시트에 결과 기록까지" style="width:100%;height:auto;font-family:inherit"><rect x="20" y="46" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="95.0" y="69" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">QA 시트</text><text x="95.0" y="88" text-anchor="middle" font-size="12" style="fill:var(--muted)">새 행 추가</text><rect x="200" y="46" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="275.0" y="69" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">감지</text><text x="275.0" y="88" text-anchor="middle" font-size="12" style="fill:var(--muted)">3시간 수정 없음</text><line x1="173" y1="74.0" x2="197" y2="74.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="197.0,74.0 189.0,69.0 189.0,79.0" style="fill:var(--muted)"/><rect x="380" y="46" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="455.0" y="69" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">Preflight</text><text x="455.0" y="88" text-anchor="middle" font-size="12" style="fill:var(--muted)">플레이·컴파일·씬·git</text><line x1="353" y1="74.0" x2="377" y2="74.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="377.0,74.0 369.0,69.0 369.0,79.0" style="fill:var(--muted)"/><rect x="560" y="46" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="635.0" y="69" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">브랜치</text><text x="635.0" y="88" text-anchor="middle" font-size="12" style="fill:var(--muted)">qa-auto/MMDD</text><line x1="533" y1="74.0" x2="557" y2="74.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="557.0,74.0 549.0,69.0 549.0,79.0" style="fill:var(--muted)"/><rect x="740" y="46" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--accent)" stroke-width="2"/><text x="815.0" y="69" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">분류 · 수정</text><text x="815.0" y="88" text-anchor="middle" font-size="12" style="fill:var(--muted)">Claude + Unity MCP</text><line x1="713" y1="74.0" x2="737" y2="74.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="737.0,74.0 729.0,69.0 729.0,79.0" style="fill:var(--muted)"/><rect x="740" y="176" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="815.0" y="199" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">스모크 검증</text><text x="815.0" y="218" text-anchor="middle" font-size="12" style="fill:var(--muted)">QASmokeRunner</text><rect x="560" y="176" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--accent)" stroke-width="2"/><text x="635.0" y="199" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">커밋 · PR</text><text x="635.0" y="218" text-anchor="middle" font-size="12" style="fill:var(--muted)">작업 중 파일 제외</text><line x1="737" y1="204.0" x2="713" y2="204.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="713.0,204.0 721.0,209.0 721.0,199.0" style="fill:var(--muted)"/><rect x="380" y="176" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="455.0" y="199" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">빌드 · zip</text><text x="455.0" y="218" text-anchor="middle" font-size="12" style="fill:var(--muted)">build_result.json</text><line x1="557" y1="204.0" x2="533" y2="204.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="533.0,204.0 541.0,209.0 541.0,199.0" style="fill:var(--muted)"/><rect x="200" y="176" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="275.0" y="199" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">Drive 업로드</text><text x="275.0" y="218" text-anchor="middle" font-size="12" style="fill:var(--muted)">동기화 폴더</text><line x1="377" y1="204.0" x2="353" y2="204.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="353.0,204.0 361.0,209.0 361.0,199.0" style="fill:var(--muted)"/><rect x="20" y="176" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="95.0" y="199" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">시트에 기록</text><text x="95.0" y="218" text-anchor="middle" font-size="12" style="fill:var(--muted)">결과 · 원인 · 링크</text><line x1="197" y1="204.0" x2="173" y2="204.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="173.0,204.0 181.0,209.0 181.0,199.0" style="fill:var(--muted)"/><line x1="815.0" y1="105" x2="815.0" y2="173" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="815.0,173.0 820.0,165.0 810.0,165.0" style="fill:var(--muted)"/><text x="890" y="32" text-anchor="end" font-size="12" style="fill:var(--accent-text)">애매하면 고치지 않고 "확인 필요" + 질문</text><text x="635.0" y="254" text-anchor="middle" font-size="12" style="fill:var(--accent-text)">사람이 검토 후 병합</text></svg><figcaption>매일 정기 실행되는 QA 흐름 — 주황 테두리는 사람이 판단하는 지점</figcaption></figure>
-
-- **감지** — 시트 파일이 3시간 동안 수정되지 않았을 때만 처리. QA가 작성 중인 시트는 건드리지 않음
-- **Preflight** — 플레이 중·컴파일 중·저장 안 된 씬·git 상태를 검사해 하나라도 걸리면 그날은 건너뜀
-- **분류 규칙** — 수정 / 아트 패스 / 사운드 패스 / UI·리소스 필요 / 확인 필요. 번역·아트·사운드는 건드리지 않고, 확신이 없으면 고치지 않고 질문을 남김
-- **커밋 분리** — Preflight 시점에 이미 바뀌어 있던 파일(= 사람이 작업 중이던 파일)은 목록으로 고정해 커밋에서 자동 제외. `qa-auto/MMDD` 브랜치에 커밋 후 PR로 병합. 같은 기간 팀원이 수정한 대화 데이터베이스·씬과 충돌하면 3-way 병합으로 양쪽 변경을 모두 유지
-- **팀원 작업일** — 일정 파일에 등록된 날은 충돌을 피하려고 원인 분석만 하고 "수정 대기"로 기록
-- **놓친 회차** — 하루 세 번 재시도 작업이 마지막 실행 기록을 확인해, 건너뛴 회차를 다시 실행
-
-**설계 포인트: 파일 기반 요청/결과** — 빌드는 동기 작업이라 MCP 호출이 빌드 도중 타임아웃되고, 응답이 없으면 같은 메뉴를 다시 보내기도 했습니다. 그래서 MCP는 메뉴만 호출하고, 요청과 결과는 JSON 파일로 주고받게 했습니다. 빌드는 `building → zipping → copying → done/failed` 상태를 파일에 계속 기록하고, 정기 작업은 그 파일을 폴링합니다. 중복 실행은 실행 중 플래그로 막았습니다.
-
-<details class="code-fold">
-<summary>코드 보기 — QAAutoBuild.GitCommit (사람의 작업 파일 제외)</summary>
-
-```csharp
-public static void GitCommit()
-{
-    AssetDatabase.SaveAssets();
-    var req = ReadJson<GitReq>("git_req.json");
-    var res = new GitResult { time = Now, action = "commit" };
-
-    // Preflight 시점에 이미 바뀌어 있던 파일 = 사람이 작업 중이던 파일 → 커밋 제외
-    var userDirty = new HashSet<string>();
-    string pre = AutoFile("preflight_git_dirty.txt");
-    if (File.Exists(pre))
-        foreach (var l in File.ReadAllLines(pre, Encoding.UTF8)) if (l.Length > 0) userDirty.Add(l);
-
-    string[] skipPrefix = { "Builds/", "Library/", "Temp/", "Logs/", "UserSettings/", "obj/" };
-    var mine = GitDirtyPaths().Where(p => !userDirty.Contains(p) && !p.Contains("_QAReports~")
-                     && !skipPrefix.Any(x => p.StartsWith(x, StringComparison.OrdinalIgnoreCase))).ToList();
-    if (mine.Count == 0) { res.ok = true; res.output = "커밋할 변경 없음"; WriteJson("git_result.json", res); return; }
-
-    File.WriteAllText(AutoFile("commit_paths.txt"), string.Join("\n", mine) + "\n", new UTF8Encoding(false));
-    int code = Git($"add -A --pathspec-from-file=\"{AutoFile("commit_paths.txt")}\"", out var o1);
-    // ... 커밋 메시지 파일로 commit, 결과(브랜치·해시·파일 목록)를 git_result.json 에 기록
-}
-```
-
-</details>
-
-**결과**
-
-| 처리 | 결과 |
-|---|---|
-| QA 시트 4행 | 수정 2 · 아트 패스 1 · 사운드 패스 1, 빌드 2.8GB 업로드까지 515초 |
-| QA 시트 20행 | 수정 9, 나머지 전부 분류·원인 기록 |
-
-*정기 실행 2회차 결과 기준. 아직 회차가 적어 자동 수정 비율은 시트 내용에 따라 달라질 수 있습니다.*
-
-**아쉬운 점** — 지금 구조는 PC 한 대에서 Unity 에디터가 켜져 있어야 동작합니다. 팀이 커지거나 빌드가 잦아지면 빌드는 CI 서버(Jenkins 등)에서 batchmode로 돌리고, Claude는 시트 분류·수정 단계만 맡도록 나누는 것이 맞습니다. 또 스모크 러너는 멈춤·에러·검은 화면 같은 기계적인 문제만 잡기 때문에, 연출 타이밍이나 문장의 어색함은 여전히 사람이 확인합니다.
-
-### 5-3. 엔딩 분기 QA 툴 — 에디터 창 + 빌드용 오버레이
-
-**문제** — KILLA는 플레이어의 선택과 호감도에 따라 여러 엔딩으로 갈라집니다. 엔딩 하나를 확인하려면 해당 분기 지점까지 직접 플레이하며 조건 변수를 맞춰야 했고, 엔딩 판정 규칙을 고칠 때마다 모든 경로를 다시 확인해야 했습니다. 판정이 기대와 다르게 나와도 **어떤 조건 때문에 그 엔딩이 됐는지** 보이지 않았습니다.
-
-**해결** — 엔딩 판정과 QA 도구를 함께 설계했습니다.
-
-- **판정을 데이터로** — 엔딩 판정을 순서가 곧 우선순위인 Lua 조건 규칙 목록(`EndingRuleSet`, ScriptableObject)으로 만들고, 모든 엔딩 확정 지점이 하나의 진입점(`EndingResolver`)을 거치게 했습니다. 결과는 대화 시스템 변수에만 저장해 세이브를 불러와도 이전 판정이 남지 않습니다. 에디터에서는 조건이 비었거나 엔딩 ID가 중복된 규칙을 저장 시점에 경고합니다.
-- **경로 프리셋** — 엔딩 경로마다 "어느 씬·스토리 단계·스폰 위치로 보내고, 어떤 변수를 세팅할지 + 기대 엔딩 + 도착 후 할 일"을 프리셋(ScriptableObject)으로 정의했습니다. 버튼 한 번에 엔딩 변수를 초기화하고 해당 지점으로 이동합니다.
-- **판정 미리보기** — 현재 변수로 모든 규칙을 평가해 규칙별 참/거짓과 "위에서부터 처음 참인 규칙"을 보여줍니다. 판정이 기대와 다를 때 원인 조건을 바로 찾을 수 있습니다.
-- **강제 연출 · 실시간 변수 · Lua 실행** — 판정과 무관하게 특정 엔딩 연출만 재생, 감시할 변수를 실시간 표시, Lua를 직접 실행해 상태를 만드는 기능을 넣었습니다.
-- **에디터와 빌드 모두에서** — 개발 중에는 에디터 창(`KILLA > Ending QA`)으로, QA 빌드에서는 같은 기능을 F9로 여는 IMGUI 오버레이로 씁니다. 오버레이는 `DEBUG_QA` 심볼이 있을 때만 컴파일되어 출시 빌드에는 기능이 포함되지 않습니다.
-
-**결과** — 엔딩 확인이 "분기 지점까지 처음부터 플레이"에서 "프리셋 선택 → 이동 → 판정 확인"으로 바뀌었고, 판정 규칙을 고친 뒤에도 모든 엔딩 경로를 같은 순서로 반복 확인할 수 있게 되었습니다. QA 팀원이 프로그래머를 거치지 않고 직접 엔딩을 검증합니다.
+엔딩 판정을 순서가 곧 우선순위인 Lua 규칙 목록(`EndingRuleSet`)으로 만들고, 엔딩 경로를 프리셋으로 정의했습니다. QA는 F9 한 번으로 원하는 엔딩 지점에 이동하고, 규칙별 참/거짓으로 판정 원인을 바로 확인합니다. 에디터 창과 QA 빌드 오버레이 모두에서 쓰며, 출시 빌드에는 포함되지 않습니다(`DEBUG_QA`).
 
 <details class="code-fold">
 <summary>코드 보기 — EndingRuleSet (판정 · 판정 미리보기)</summary>
@@ -489,47 +372,47 @@ public class EndingRuleSet : ScriptableObject
 
 </details>
 
+### 3-2. 빌드 모드 · 시작 지점 — `BuildConfig`
+
+Normal / GameShow / QA 빌드를 ScriptableObject 하나로 전환하고, 시작 지점(씬 + 스토리 단계 + 스폰 + 날짜 + 초기 Lua)을 데이터로 지정합니다. 전시·QA 빌드를 코드 수정 없이 내보냅니다.
+
 <details class="code-fold">
-<summary>코드 보기 — 프리셋으로 엔딩 경로 이동 (EndingQAOverlay 발췌)</summary>
+<summary>코드 보기 — BuildConfig.StartPoint</summary>
 
 ```csharp
-#if UNITY_EDITOR || DEBUG_QA   // 출시 빌드에는 포함되지 않음
-private void Jump(EndingQAPresets.Preset p)
+[CreateAssetMenu(fileName = "BuildConfig", menuName = "Game/Build Config")]
+public class BuildConfig : ScriptableObject
 {
-    // 1) 이전 판정 지우고 엔딩 변수 초기화 → 프리셋 변수 적용
-    EndingResolver.Instance?.ClearResult();
-    RunLua(presets.resetLua);
-    RunLua(p.luaSetup);
+    public enum BuildMode { Normal = 0, GameShow = 1, QA = 2 }
 
-    // 2) 씬 활성화 직전에 스토리 단계·스폰 지정 (BuildConfig.StartPoint와 같은 진입 방식)
-    string step = p.storyStep, spawn = p.spawnId ?? "";
-    Debug.Log($"[EndingQA] '{p.title}' → {p.sceneName} / {step} @{spawn}  (기대 {p.expectedEndingId})");
-    SceneController.LoadScene(p.sceneName, beforeActivate: () => StoryFlow.SetStory(step, spawn));
+    [Serializable]
+    public class StartPoint
+    {
+        public string sceneName;   // 로드할 씬
+        public string storyStep;   // 활성화할 스토리 레이어 이름
+        public string spawnId;     // 스폰 포인트 이름
+        public bool overrideDay = true;
+        [Min(0)] public int day = 0;
+        [TextArea(2, 8)] public string seedLua; // 퀘스트·플래그·아이템 초기 상태
+
+        public bool IsValid => !string.IsNullOrEmpty(sceneName);
+    }
+
+    [SerializeField] private BuildMode mode = BuildMode.Normal;
+    [SerializeField] private StartPoint gameShowStart = new StartPoint();
+    [SerializeField, Range(30f, 600f)] private float idleTimeoutSeconds = 300f; // 전시장 무입력 시 복귀
+
+    public bool IsGameShowMode => mode == BuildMode.GameShow;
+    public bool IsQAMode => mode == BuildMode.QA;
+    public StartPoint GameShowStart => gameShowStart;
 }
-#endif
 ```
 
 </details>
 
-### 5-4. 안정화
+### 3-3. 대사별 FMOD 효과음 자동 재생
 
-- 전역 매니저 14종 전수 감사 — DontDestroyOnLoad 중복 가드, 실행 순서 정리, Lua 변수명 `GLOBAL.XXX` 규칙으로 통일
-- `GlobalVarAuditor`로 대화 데이터베이스의 변수 오탈자·미사용 변수 자동 검출
-- 세이브/로드 전면 개편: 슬롯 불일치, 씬 전환 중 저장 타이밍, NPC 위치 복원, 대화 중복 재생 문제 해결
-- 프로젝트 손상(URP 렌더러, 스크립팅 심볼, 자막 프리팹) 발생 시 Git 이력으로 복구
-
-## 6. 협업 툴: 대사별 FMOD 효과음 자동 재생
-
-**문제** — 대사에 맞춰 효과음을 넣으려면 씬에 이벤트를 따로 배치하거나, 대사 노드마다 이벤트를 일일이 입력해야 했습니다. 효과음을 추가하거나 교체할 때마다 씬 수정과 반복 입력 작업이 필요했습니다.
-
-**해결** — 사운드 담당이 코드 없이 이벤트를 만들고 고칠 수 있는 FMOD의 장점을 살려, 대화 데이터베이스의 각 대사 항목에 FMOD 이벤트를 지정해 두면, 그 대사가 시작될 때 자동으로 재생하는 런타임 플레이어 `DialogueFmodLocalPlayer`를 만들었습니다.
-
-- `RuntimeInitializeOnLoadMethod`로 게임 시작 시 스스로 설치 — 씬과 프리팹을 하나도 수정하지 않음
-- 이벤트를 경로가 아닌 GUID로 조회해, FMOD에서 이벤트 이름이나 폴더를 변경해도 연결이 유지됨
-- 2D 원샷 이벤트만 재생하고 다른 이벤트·버스는 제어하지 않아 BGM과 기존 씬 이벤트에 영향 없음
-- 같은 대사가 여러 경로로 중복 통지되어도 한 번만 재생하고, 잘못된 GUID나 로드되지 않은 뱅크는 대화·항목 ID와 함께 경고로 출력
-
-**결과** — 효과음 추가·교체가 대화 데이터 수정만으로 끝나, 사운드 작업이 코드나 씬 수정 없이 게임에 즉시 반영됩니다. 사운드 팀원이 프로그래머를 기다리지 않아도 됩니다.
+대화 데이터의 대사 항목에 FMOD 이벤트만 지정하면 그 대사와 함께 재생됩니다. 씬·프리팹 수정 없이 자동 설치되고, 경로 대신 GUID로 조회해 이벤트 이름이 바뀌어도 연결이 유지됩니다. 사운드 담당이 프로그래머를 기다리지 않습니다.
 
 <details class="code-fold">
 <summary>코드 보기 — DialogueFmodLocalPlayer.OnLine</summary>
@@ -562,47 +445,47 @@ private void OnLine(Subtitle subtitle)
 
 </details>
 
-## 7. 플레이 화면 — UI · 퍼즐 · 기믹
+## 4. 플레이 화면 — UI · 퍼즐 · 기믹
 
 장면마다 조작 방식이 다른 UI와 퍼즐, 기믹을 만들었습니다. 스포일러를 피하기 위해 장면과 인물은 밝히지 않습니다. 이 밖에 아이템을 끌어 대상에 사용하는 드래그 앤 드롭 퍼즐 여러 종을 공통 구조로 만들었습니다.
 
-### 7-1. 가방 · 수첩 UI
+### 4-1. 가방 · 수첩 UI
 
 메뉴·인벤토리·수첩·지도·파우치 5개 화면이 Spine 연출로 전환되는 가방 UI와 셰이더로 책장을 넘기는 수첩. 화면 전환·입력 잠금을 한 매니저가 관리하고, 대화 중 아이템 제출, 미확인 항목 느낌표 배지, 알림 큐를 함께 구현
 
 <img src="/images/killa-note-suspect.gif" alt="수첩 — 용의자에 대하여와 사건에 대하여" loading="lazy" decoding="async" />
 
-### 7-2. 두 세계 전환
+### 4-2. 두 세계 전환
 
 겹쳐 있는 두 세계를 버튼 하나로 오가며 렌더링·충돌·레이캐스트를 함께 전환
 
 <img src="/images/killa-two-worlds.gif" alt="두 세계 전환" loading="lazy" decoding="async" />
 
-### 7-3. 중력 반전 이동
+### 4-3. 중력 반전 이동
 
 발사 구역에서 쏘아 올려 천장을 바닥처럼 걷는 이동
 
 <img src="/images/killa-gravity.gif" alt="중력 반전 이동" loading="lazy" decoding="async" />
 
-### 7-4. 체스말 퍼즐
+### 4-4. 체스말 퍼즐
 
 체스말의 이동 규칙대로 말을 옮겨 길을 찾는 퍼즐, 틀린 수는 연출과 함께 초기화
 
 <img src="/images/killa-chess-puzzle.gif" alt="체스말 퍼즐" loading="lazy" decoding="async" />
 
-### 7-5. 진실의 필름 퍼즐
+### 4-5. 진실의 필름 퍼즐
 
 인물의 필름 장면을 넘겨 보며 질문에 맞는 장면을 골라 필름 릴을 채우는 추리 퍼즐
 
 <img src="/images/killa-film-puzzle.gif" alt="진실의 필름 퍼즐" loading="lazy" decoding="async" />
 
-### 7-6. 간수 이동 경로 퍼즐
+### 4-6. 간수 이동 경로 퍼즐
 
 같은 색 점을 이어 모든 칸을 채우는 경로 퍼즐, 보드가 바뀔 때마다 판정하고 상태머신으로 정답을 한 번만 처리
 
 <img src="/images/killa-guard-route.gif" alt="간수 이동 경로 퍼즐" loading="lazy" decoding="async" />
 
-### 7-7. 공명 시스템
+### 4-7. 공명 시스템
 
 상징을 끌어 다른 상징에 놓으면 선을 따라 합쳐지며 새 상징이 나오는 조합 UI, 조합 결과는 ScriptableObject 데이터로 정의
 
@@ -610,20 +493,4 @@ private void OnLine(Subtitle subtitle)
 
 ## 전시 이력 — 30회 이상 · 5개국
 
-**해외**
-- 도쿄게임쇼 2024 **Selected Indie 80** (일본)
-- 도쿄게임쇼 2025 · 2026 (일본) — 2026년은 TOEI Games 부스
-- **gamescom 2024** Indie Arena Booth (독일)
-- BitSummit Drift 2024 · BitSummit PUNCH 2026 (일본 교토)
-- Taipei Game Show 2025 (대만)
-- Tokyo Indie Games Summit 2025 (일본)
-- LA COMIC-CON (미국), ANIMAGIC (독일)
-
-**국내**
-- G-STAR 2023 · 2024 인디 쇼케이스
-- BIC 2023 · 2026 (부산인디커넥트 페스티벌)
-- 버닝비버 2023 · 2024 — 2년 연속 '올해의 버닝비버'
-- 플레이엑스포 2024 Indie Arcade
-- Unite Seoul 2026 Legendary & Indie Showcase
-
-외 일러스타 페스, 서울팝콘, GXG, GLS, UGDAP, 도쿄 게임 던전, GAME AiCON 등
+도쿄게임쇼 2024 **Selected Indie 80** · 2025 · 2026(TOEI Games 부스), **gamescom 2024** Indie Arena Booth, BitSummit Drift 2024 · PUNCH 2026, Taipei Game Show 2025, Tokyo Indie Games Summit 2025, LA COMIC-CON, ANIMAGIC, G-STAR 2023 · 2024 인디 쇼케이스, BIC 2023 · 2026, 버닝비버 2023 · 2024(2년 연속 '올해의 버닝비버'), 플레이엑스포 2024, Unite Seoul 2026 외
