@@ -37,17 +37,119 @@ links:
 
 ## 1. AI를 활용한 개발
 
-출시 준비 단계부터 Unity MCP로 Claude를 에디터에 연결해 개발했습니다. 조사·분석·반복 작업은 Claude에 맡기고, 구조 설계와 최종 판단은 직접 했습니다.
+출시 준비 단계부터 Unity MCP로 Claude를 에디터에 연결해 개발했습니다. **조사·분석·반복 작업은 Claude에 맡기고, 구조 설계와 최종 판단은 직접** 했습니다. 도구의 한계는 문서로 정리해 맡길 일의 기준으로 삼았고, 큰 수정은 **별도 서브에이전트로 교차 검토**했으며, AI의 분석과 측정 수치는 **같은 조건에서 다시 재서 확인**했습니다.
 
-- **맡길 일의 기준** — 도구 한계(중복 메서드 오탐, 코드 실행 미동작 등)를 문서로 정리
-- **교차 검토** — 큰 수정은 별도 서브에이전트가 버그·구조·성능을 다시 검토
-- **재측정** — AI 분석과 측정 수치는 같은 조건에서 다시 확인
+### 1-1. 시작 시 멈춤 제거
 
-### 1-1. 회차 플레이 구조 개편 (8개월)
+**문제** — 시작할 때 화면이 약 4초간 검게 멈췄습니다. 후처리 플러그인(VolFx)이 실행할 때마다 2048×2048 노이즈 이미지를 새로 그리고 있었습니다.
+
+**설계** — 노이즈를 미리 베이크해 불러오도록 바꿨습니다. 쓰는 값이 한 채널뿐이라 RGBA32(16MB) 대신 R8(4MB)로 저장하고, Read/Write를 꺼 CPU 쪽 사본도 없앴습니다. 같은 빌드에서 원본·개선을 각 3회 A/B 측정했습니다.
+
+| 지표 | 원본 | 개선 |
+|---|---|---|
+| 노이즈 생성 | 352ms | 0ms |
+| 시작 직후 두 번째 프레임 | 766ms | 425ms (−44%) |
+| 노이즈 이미지 메모리 | 16MB | 4MB (−75%) |
+
+*i7-13700F / RTX 5060, Development 빌드 기준. Release 빌드·저사양 PC는 다시 측정하지 않음*
+
+**발견** — Deep Profiling이 켜져 있으면 작은 함수를 많이 부르는 코드가 실제보다 크게 측정됩니다(같은 코드 352ms vs 3,227ms). 첫 측정의 "4초"는 이 왜곡이었습니다.
+
+<details class="code-fold">
+<summary>시각 자료 보기 — Profiler 전후 비교</summary>
+
+<img src="/images/killa-perf-timeline.webp" alt="시작 직후 두 번째 프레임 Profiler Timeline 전후 비교" loading="lazy" decoding="async" />
+
+<img src="/images/killa-perf-hierarchy.webp" alt="시작 직후 두 번째 프레임 Profiler Hierarchy 전후 비교" loading="lazy" decoding="async" />
+
+*같은 빌드의 원본(위)과 개선(아래)을 Profiler로 캡처한 시작 직후 두 번째 프레임 — 노이즈 생성 구간(352ms)이 사라짐*
+
+</details>
+
+### 1-2. 설치 용량 감축
+
+**문제** — 압축 설정을 해 둔 이미지가 압축되지 않아 빌드가 6.4GB였습니다. 원인은 크기가 4의 배수가 아닌 이미지(BC7은 4×4 블록 단위로 압축)였습니다.
+
+**설계** — 가장자리에 투명 여백을 붙여 크기만 맞추고 화면 위치는 유지했습니다. 아티스트가 원본을 다시 작업할 필요가 없고, 137장 시범 적용 후 1,645장 전체에 적용했습니다.
+
+| 항목 | 이전 | 이후 |
+|---|---|---|
+| 빌드 전체 | 6,418MB | 4,675MB (−27%) |
+| 이미지 | 5,151MB | 3,933MB |
+| 영상 17개 | 873MB | 349MB (−60%) |
+
+**아쉬운 점** — 일괄 변환이라 새 이미지가 같은 문제를 다시 만들 수 있습니다. 임포트 시 크기를 검사하는 `AssetPostprocessor`가 재발을 막는 방법입니다.
+
+<details class="code-fold">
+<summary>시각 자료 보기 — 원본 · 압축 결과 비교</summary>
+
+<img src="/images/killa-bc7-compare.webp" alt="원본, 압축 결과, 차이 8배 확대 비교" loading="lazy" decoding="async" />
+
+*왼쪽부터 원본 · 압축 결과 · 차이를 8배 확대한 이미지 — 차이가 거의 보이지 않음*
+
+</details>
+
+### 1-3. QA 자동화
+
+**문제** — 분기 서사라 버그 하나를 재현하려면 앞 대사를 모두 진행해야 했고, QA 시트로 수십 건씩 들어오는 버그를 분류·수정·빌드·공유까지 손으로 반복했습니다.
+
+<figure class="flow"><svg viewBox="0 0 910 268" role="img" aria-label="QA 자동화 흐름: QA 시트 새 행부터 시트에 결과 기록까지" style="width:100%;height:auto;font-family:inherit"><rect x="20" y="46" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="95.0" y="69" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">QA 시트</text><text x="95.0" y="88" text-anchor="middle" font-size="12" style="fill:var(--muted)">새 행 추가</text><rect x="200" y="46" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="275.0" y="69" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">감지</text><text x="275.0" y="88" text-anchor="middle" font-size="12" style="fill:var(--muted)">3시간 수정 없음</text><line x1="173" y1="74.0" x2="197" y2="74.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="197.0,74.0 189.0,69.0 189.0,79.0" style="fill:var(--muted)"/><rect x="380" y="46" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="455.0" y="69" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">Preflight</text><text x="455.0" y="88" text-anchor="middle" font-size="12" style="fill:var(--muted)">플레이·컴파일·씬·git</text><line x1="353" y1="74.0" x2="377" y2="74.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="377.0,74.0 369.0,69.0 369.0,79.0" style="fill:var(--muted)"/><rect x="560" y="46" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="635.0" y="69" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">브랜치</text><text x="635.0" y="88" text-anchor="middle" font-size="12" style="fill:var(--muted)">qa-auto/MMDD</text><line x1="533" y1="74.0" x2="557" y2="74.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="557.0,74.0 549.0,69.0 549.0,79.0" style="fill:var(--muted)"/><rect x="740" y="46" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--accent)" stroke-width="2"/><text x="815.0" y="69" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">분류 · 수정</text><text x="815.0" y="88" text-anchor="middle" font-size="12" style="fill:var(--muted)">Claude + Unity MCP</text><line x1="713" y1="74.0" x2="737" y2="74.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="737.0,74.0 729.0,69.0 729.0,79.0" style="fill:var(--muted)"/><rect x="740" y="176" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="815.0" y="199" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">스모크 검증</text><text x="815.0" y="218" text-anchor="middle" font-size="12" style="fill:var(--muted)">QASmokeRunner</text><rect x="560" y="176" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--accent)" stroke-width="2"/><text x="635.0" y="199" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">커밋 · PR</text><text x="635.0" y="218" text-anchor="middle" font-size="12" style="fill:var(--muted)">작업 중 파일 제외</text><line x1="737" y1="204.0" x2="713" y2="204.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="713.0,204.0 721.0,209.0 721.0,199.0" style="fill:var(--muted)"/><rect x="380" y="176" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="455.0" y="199" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">빌드 · zip</text><text x="455.0" y="218" text-anchor="middle" font-size="12" style="fill:var(--muted)">build_result.json</text><line x1="557" y1="204.0" x2="533" y2="204.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="533.0,204.0 541.0,209.0 541.0,199.0" style="fill:var(--muted)"/><rect x="200" y="176" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="275.0" y="199" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">Drive 업로드</text><text x="275.0" y="218" text-anchor="middle" font-size="12" style="fill:var(--muted)">동기화 폴더</text><line x1="377" y1="204.0" x2="353" y2="204.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="353.0,204.0 361.0,209.0 361.0,199.0" style="fill:var(--muted)"/><rect x="20" y="176" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="95.0" y="199" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">시트에 기록</text><text x="95.0" y="218" text-anchor="middle" font-size="12" style="fill:var(--muted)">결과 · 원인 · 링크</text><line x1="197" y1="204.0" x2="173" y2="204.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="173.0,204.0 181.0,209.0 181.0,199.0" style="fill:var(--muted)"/><line x1="815.0" y1="105" x2="815.0" y2="173" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="815.0,173.0 820.0,165.0 810.0,165.0" style="fill:var(--muted)"/><text x="890" y="32" text-anchor="end" font-size="12" style="fill:var(--accent-text)">애매하면 고치지 않고 "확인 필요" + 질문</text><text x="635.0" y="254" text-anchor="middle" font-size="12" style="fill:var(--accent-text)">사람이 검토 후 병합</text></svg><figcaption>매일 정기 실행되는 QA 흐름 — 주황 테두리는 사람이 판단하는 지점</figcaption></figure>
+
+**설계** — 사람이 판단할 지점만 남기고 나머지를 자동화했습니다.
+
+- **스모크 테스트 러너**(`QASmokeRunner`) — 메뉴 하나로 엔딩 판정·포탈 조건·모든 씬 레이어·실제 대사 진행을 검사하고 리포트를 남김
+- **판단 기준을 규칙으로** — 번역·아트·사운드는 건드리지 않고, 애매한 행은 고치지 않고 질문으로 남김
+- **사람 작업 보호** — 시작 시점에 이미 바뀌어 있던 파일은 커밋에서 자동 제외, `qa-auto/MMDD` 브랜치 → PR → 검토 후 병합
+- **파일 기반 요청/결과** — 빌드 중 MCP 호출이 타임아웃되므로 요청·진행 상태를 JSON 파일로 주고받고 폴링
+
+**결과** — 정기 실행 2회차 기준: 4행 중 2건 수정·빌드 2.8GB 업로드까지 515초, 20행 중 9건 수정·나머지 분류
+
+**아쉬운 점** — 에디터가 켜진 PC 한 대에 의존합니다. 규모가 커지면 빌드는 CI 서버(batchmode)로 옮기고 Claude는 분류·수정만 맡는 구조가 맞습니다.
+
+<details class="code-fold">
+<summary>코드 보기 — QAAutoBuild.GitCommit (사람의 작업 파일 제외)</summary>
+
+```csharp
+public static void GitCommit()
+{
+    AssetDatabase.SaveAssets();
+    var req = ReadJson<GitReq>("git_req.json");
+    var res = new GitResult { time = Now, action = "commit" };
+
+    // Preflight 시점에 이미 바뀌어 있던 파일 = 사람이 작업 중이던 파일 → 커밋 제외
+    var userDirty = new HashSet<string>();
+    string pre = AutoFile("preflight_git_dirty.txt");
+    if (File.Exists(pre))
+        foreach (var l in File.ReadAllLines(pre, Encoding.UTF8)) if (l.Length > 0) userDirty.Add(l);
+
+    string[] skipPrefix = { "Builds/", "Library/", "Temp/", "Logs/", "UserSettings/", "obj/" };
+    var mine = GitDirtyPaths().Where(p => !userDirty.Contains(p) && !p.Contains("_QAReports~")
+                     && !skipPrefix.Any(x => p.StartsWith(x, StringComparison.OrdinalIgnoreCase))).ToList();
+    if (mine.Count == 0) { res.ok = true; res.output = "커밋할 변경 없음"; WriteJson("git_result.json", res); return; }
+
+    File.WriteAllText(AutoFile("commit_paths.txt"), string.Join("\n", mine) + "\n", new UTF8Encoding(false));
+    int code = Git($"add -A --pathspec-from-file=\"{AutoFile("commit_paths.txt")}\"", out var o1);
+    // ... 커밋 메시지 파일로 commit, 결과(브랜치·해시·파일 목록)를 git_result.json 에 기록
+}
+```
+
+</details>
+
+## 2. 콘텐츠 시스템 설계
+
+엔딩 후 처음부터 다시 플레이하는 회차 게임이라, **상태를 어디에 두고 언제 되돌릴지**가 콘텐츠 설계의 중심이었습니다. 단방향으로 만들어진 구조를 이 기준으로 개편하고, 그 위에 게임오버·히든 엔딩 같은 회차 콘텐츠를 얹었습니다.
+
+| 구분 | 저장 위치 | 예 |
+|---|---|---|
+| 되돌릴 상태 | 세이브 슬롯 (대화 시스템 변수) | 스토리 단계, 퀘스트, 호감도, 남은 목숨 |
+| 남길 상태 | 영구 프로필 `profile.json` | 엔딩·데드씬 수집, 게임오버 기록, 플레이타임 |
+| 저장하지 않는 값 | 매번 계산 | 하루 남은 행동력 = 한도 − 오늘 대화한 NPC 수 |
+
+### 2-1. 회차 플레이 구조 개편 (8개월)
 
 **문제** — 회차 플레이가 기획 의도였지만, 실제 구현은 지나간 장면에 다시 오지 않는 단방향 구조였습니다. 상태가 30개 이상의 씬에 흩어져 있어 같은 장면을 다시 지나가면 어긋났습니다.
 
-**설계**
+**설계** — 흩어진 상태를 한곳으로 모으고, 장면 구성을 데이터로 바꿨습니다.
 
 - 씬 30개 이상 → 장소 기준 약 15개로 재구성
 - 상태를 대화 시스템 전역 변수(`GLOBAL.XXX`) 한곳으로 통합 — 대사 분기·세이브·QA가 같은 값을 읽음
@@ -153,117 +255,7 @@ private static bool ConditionMet(Route r)
 
 </details>
 
-### 1-2. 시작 시 멈춤 제거
-
-**문제** — 시작할 때 화면이 약 4초간 검게 멈췄습니다. 후처리 플러그인(VolFx)이 실행할 때마다 2048×2048 노이즈 이미지를 새로 그리고 있었습니다.
-
-**설계** — 노이즈를 미리 베이크해 불러오도록 바꿨습니다. 쓰는 값이 한 채널뿐이라 RGBA32(16MB) 대신 R8(4MB)로 저장하고, Read/Write를 꺼 CPU 쪽 사본도 없앴습니다.
-
-**AI 분담** — Claude: 원인 분석·대안 비교·A/B 측정 도구 제작<br>나: 생성 시점만 늦추는 안(멈춤이 옮겨갈 뿐)을 버리고 베이크 방식 선택<br>검증: 같은 빌드에서 각 3회 측정, 픽셀 단위 결과 비교
-
-| 지표 | 원본 | 개선 |
-|---|---|---|
-| 노이즈 생성 | 352ms | 0ms |
-| 시작 직후 두 번째 프레임 | 766ms | 425ms (−44%) |
-| 노이즈 이미지 메모리 | 16MB | 4MB (−75%) |
-
-*i7-13700F / RTX 5060, Development 빌드 기준. Release 빌드·저사양 PC는 다시 측정하지 않음*
-
-**발견** — Deep Profiling이 켜져 있으면 작은 함수를 많이 부르는 코드가 실제보다 크게 측정됩니다(같은 코드 352ms vs 3,227ms). 첫 측정의 "4초"는 이 왜곡이었습니다.
-
-<details class="code-fold">
-<summary>시각 자료 보기 — Profiler 전후 비교</summary>
-
-<img src="/images/killa-perf-timeline.webp" alt="시작 직후 두 번째 프레임 Profiler Timeline 전후 비교" loading="lazy" decoding="async" />
-
-<img src="/images/killa-perf-hierarchy.webp" alt="시작 직후 두 번째 프레임 Profiler Hierarchy 전후 비교" loading="lazy" decoding="async" />
-
-*같은 빌드의 원본(위)과 개선(아래)을 Profiler로 캡처한 시작 직후 두 번째 프레임 — 노이즈 생성 구간(352ms)이 사라짐*
-
-</details>
-
-### 1-3. 설치 용량 감축
-
-**문제** — 압축 설정을 해 둔 이미지가 압축되지 않아 빌드가 6.4GB였습니다. 원인은 크기가 4의 배수가 아닌 이미지(BC7은 4×4 블록 단위로 압축)였습니다.
-
-**설계** — 가장자리에 투명 여백을 붙여 크기만 맞추고 화면 위치는 유지했습니다. 아티스트가 원본을 다시 작업할 필요가 없습니다.
-
-**AI 분담** — Claude: 빌드 리포트·이미지 설정 교차 분석, 일괄 변환 도구 제작<br>나: 그림이 바뀌는 축소안·메모리가 느는 아틀라스안 대신 여백 방식 선택<br>검증: 백업·137장 시범 적용 후 1,645장 전체 적용
-
-| 항목 | 이전 | 이후 |
-|---|---|---|
-| 빌드 전체 | 6,418MB | 4,675MB (−27%) |
-| 이미지 | 5,151MB | 3,933MB |
-| 영상 17개 | 873MB | 349MB (−60%) |
-
-**아쉬운 점** — 일괄 변환이라 새 이미지가 같은 문제를 다시 만들 수 있습니다. 임포트 시 크기를 검사하는 `AssetPostprocessor`가 재발을 막는 방법입니다.
-
-<details class="code-fold">
-<summary>시각 자료 보기 — 원본 · 압축 결과 비교</summary>
-
-<img src="/images/killa-bc7-compare.webp" alt="원본, 압축 결과, 차이 8배 확대 비교" loading="lazy" decoding="async" />
-
-*왼쪽부터 원본 · 압축 결과 · 차이를 8배 확대한 이미지 — 차이가 거의 보이지 않음*
-
-</details>
-
-### 1-4. QA 자동화
-
-**문제** — 분기 서사라 버그 하나를 재현하려면 앞 대사를 모두 진행해야 했고, QA 시트로 수십 건씩 들어오는 버그를 분류·수정·빌드·공유까지 손으로 반복했습니다.
-
-<figure class="flow"><svg viewBox="0 0 910 268" role="img" aria-label="QA 자동화 흐름: QA 시트 새 행부터 시트에 결과 기록까지" style="width:100%;height:auto;font-family:inherit"><rect x="20" y="46" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="95.0" y="69" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">QA 시트</text><text x="95.0" y="88" text-anchor="middle" font-size="12" style="fill:var(--muted)">새 행 추가</text><rect x="200" y="46" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="275.0" y="69" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">감지</text><text x="275.0" y="88" text-anchor="middle" font-size="12" style="fill:var(--muted)">3시간 수정 없음</text><line x1="173" y1="74.0" x2="197" y2="74.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="197.0,74.0 189.0,69.0 189.0,79.0" style="fill:var(--muted)"/><rect x="380" y="46" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="455.0" y="69" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">Preflight</text><text x="455.0" y="88" text-anchor="middle" font-size="12" style="fill:var(--muted)">플레이·컴파일·씬·git</text><line x1="353" y1="74.0" x2="377" y2="74.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="377.0,74.0 369.0,69.0 369.0,79.0" style="fill:var(--muted)"/><rect x="560" y="46" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="635.0" y="69" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">브랜치</text><text x="635.0" y="88" text-anchor="middle" font-size="12" style="fill:var(--muted)">qa-auto/MMDD</text><line x1="533" y1="74.0" x2="557" y2="74.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="557.0,74.0 549.0,69.0 549.0,79.0" style="fill:var(--muted)"/><rect x="740" y="46" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--accent)" stroke-width="2"/><text x="815.0" y="69" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">분류 · 수정</text><text x="815.0" y="88" text-anchor="middle" font-size="12" style="fill:var(--muted)">Claude + Unity MCP</text><line x1="713" y1="74.0" x2="737" y2="74.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="737.0,74.0 729.0,69.0 729.0,79.0" style="fill:var(--muted)"/><rect x="740" y="176" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="815.0" y="199" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">스모크 검증</text><text x="815.0" y="218" text-anchor="middle" font-size="12" style="fill:var(--muted)">QASmokeRunner</text><rect x="560" y="176" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--accent)" stroke-width="2"/><text x="635.0" y="199" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">커밋 · PR</text><text x="635.0" y="218" text-anchor="middle" font-size="12" style="fill:var(--muted)">작업 중 파일 제외</text><line x1="737" y1="204.0" x2="713" y2="204.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="713.0,204.0 721.0,209.0 721.0,199.0" style="fill:var(--muted)"/><rect x="380" y="176" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="455.0" y="199" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">빌드 · zip</text><text x="455.0" y="218" text-anchor="middle" font-size="12" style="fill:var(--muted)">build_result.json</text><line x1="557" y1="204.0" x2="533" y2="204.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="533.0,204.0 541.0,209.0 541.0,199.0" style="fill:var(--muted)"/><rect x="200" y="176" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="275.0" y="199" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">Drive 업로드</text><text x="275.0" y="218" text-anchor="middle" font-size="12" style="fill:var(--muted)">동기화 폴더</text><line x1="377" y1="204.0" x2="353" y2="204.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="353.0,204.0 361.0,209.0 361.0,199.0" style="fill:var(--muted)"/><rect x="20" y="176" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="95.0" y="199" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">시트에 기록</text><text x="95.0" y="218" text-anchor="middle" font-size="12" style="fill:var(--muted)">결과 · 원인 · 링크</text><line x1="197" y1="204.0" x2="173" y2="204.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="173.0,204.0 181.0,209.0 181.0,199.0" style="fill:var(--muted)"/><line x1="815.0" y1="105" x2="815.0" y2="173" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="815.0,173.0 820.0,165.0 810.0,165.0" style="fill:var(--muted)"/><text x="890" y="32" text-anchor="end" font-size="12" style="fill:var(--accent-text)">애매하면 고치지 않고 "확인 필요" + 질문</text><text x="635.0" y="254" text-anchor="middle" font-size="12" style="fill:var(--accent-text)">사람이 검토 후 병합</text></svg><figcaption>매일 정기 실행되는 QA 흐름 — 주황 테두리는 사람이 판단하는 지점</figcaption></figure>
-
-**설계**
-
-- **스모크 테스트 러너**(`QASmokeRunner`) — 메뉴 하나로 엔딩 판정·포탈 조건·모든 씬 레이어·실제 대사 진행을 검사하고 리포트를 남김
-- **판단 기준을 규칙으로** — 번역·아트·사운드는 건드리지 않고, 애매한 행은 고치지 않고 질문으로 남김
-- **사람 작업 보호** — 시작 시점에 이미 바뀌어 있던 파일은 커밋에서 자동 제외, `qa-auto/MMDD` 브랜치 → PR → 검토 후 병합
-- **파일 기반 요청/결과** — 빌드 중 MCP 호출이 타임아웃되므로 요청·진행 상태를 JSON 파일로 주고받고 폴링
-
-**결과** — 정기 실행 2회차 기준: 4행 중 2건 수정·빌드 2.8GB 업로드까지 515초, 20행 중 9건 수정·나머지 분류
-
-**아쉬운 점** — 에디터가 켜진 PC 한 대에 의존합니다. 규모가 커지면 빌드는 CI 서버(batchmode)로 옮기고 Claude는 분류·수정만 맡는 구조가 맞습니다.
-
-<details class="code-fold">
-<summary>코드 보기 — QAAutoBuild.GitCommit (사람의 작업 파일 제외)</summary>
-
-```csharp
-public static void GitCommit()
-{
-    AssetDatabase.SaveAssets();
-    var req = ReadJson<GitReq>("git_req.json");
-    var res = new GitResult { time = Now, action = "commit" };
-
-    // Preflight 시점에 이미 바뀌어 있던 파일 = 사람이 작업 중이던 파일 → 커밋 제외
-    var userDirty = new HashSet<string>();
-    string pre = AutoFile("preflight_git_dirty.txt");
-    if (File.Exists(pre))
-        foreach (var l in File.ReadAllLines(pre, Encoding.UTF8)) if (l.Length > 0) userDirty.Add(l);
-
-    string[] skipPrefix = { "Builds/", "Library/", "Temp/", "Logs/", "UserSettings/", "obj/" };
-    var mine = GitDirtyPaths().Where(p => !userDirty.Contains(p) && !p.Contains("_QAReports~")
-                     && !skipPrefix.Any(x => p.StartsWith(x, StringComparison.OrdinalIgnoreCase))).ToList();
-    if (mine.Count == 0) { res.ok = true; res.output = "커밋할 변경 없음"; WriteJson("git_result.json", res); return; }
-
-    File.WriteAllText(AutoFile("commit_paths.txt"), string.Join("\n", mine) + "\n", new UTF8Encoding(false));
-    int code = Git($"add -A --pathspec-from-file=\"{AutoFile("commit_paths.txt")}\"", out var o1);
-    // ... 커밋 메시지 파일로 commit, 결과(브랜치·해시·파일 목록)를 git_result.json 에 기록
-}
-```
-
-</details>
-
-## 2. 콘텐츠 시스템 설계
-
-회차 게임이라 "세이브를 불러오면 되돌아갈 상태"와 "계속 쌓일 상태"를 저장소부터 나누고, 계산할 수 있는 값은 저장하지 않았습니다.
-
-| 구분 | 저장 위치 | 예 |
-|---|---|---|
-| 되돌릴 상태 | 세이브 슬롯 (대화 시스템 변수) | 스토리 단계, 퀘스트, 호감도, 남은 목숨 |
-| 남길 상태 | 영구 프로필 `profile.json` | 엔딩·데드씬 수집, 게임오버 기록, 플레이타임 |
-| 저장하지 않는 값 | 매번 계산 | 하루 남은 행동력 = 한도 − 오늘 대화한 NPC 수 |
-
-### 2-1. 게임오버 → 히든 엔딩
+### 2-2. 게임오버 → 히든 엔딩
 
 콘텐츠마다 목숨을 두고, 게임오버 횟수가 기준을 넘으면 같은 흐름이 히든 엔딩으로 이어집니다.
 

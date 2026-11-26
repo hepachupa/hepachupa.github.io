@@ -469,3 +469,10 @@ details.highlights.fold > ul { padding: 0 18px 14px 36px; }
 .toc-min .toc ol, .toc-min .toc-title { display: none; }
 .toc-min .toc-head { margin: 0; }
 @media (max-width: 900px) { .toc-head { display: none; } .detail-layout.on.toc-min { grid-template-columns: minmax(0, 1fr); } .toc-min .toc ol { display: flex; } }
+
+/* 하위 목차는 상위 항목을 눌렀을 때만 */
+.toc li.d3 { display: none; }
+.toc li.d3.show { display: block; }
+.toc li.has-sub > button .toc-t::after { content: '▸'; margin-left: 6px; font-size: 10px; opacity: .55; display: inline-block; transition: transform .15s; }
+.toc li.has-sub.open > button .toc-t::after { transform: rotate(90deg); }
+@media (max-width: 900px) { .toc li.d3.show { display: none; } .toc li.has-sub > button .toc-t::after { content: none; } }

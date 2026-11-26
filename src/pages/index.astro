@@ -347,6 +347,22 @@ const updated = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
       tocBtns = $$<HTMLElement>('[data-toc]', root);
       docTitle = root.classList.contains('has-toc') ? (root.dataset.title ?? '') : '';
       tocBtns.forEach((b) => b.addEventListener('click', () => goTo(heads.find((h) => h.id === b.dataset.toc))));
+      // 하위 목차: 상위 항목을 눌렀을 때만 그 장의 하위 항목을 펼침 (다른 장은 접힘)
+      const groups = new Map<HTMLElement, HTMLElement[]>();
+      let cur: HTMLElement | null = null;
+      $$<HTMLElement>('.toc li', root).forEach((li) => {
+        if (li.classList.contains('d2')) { cur = li; groups.set(li, []); }
+        else if (cur) groups.get(cur)!.push(li);
+      });
+      groups.forEach((subs, li) => {
+        if (!subs.length) return;
+        li.classList.add('has-sub');
+        li.querySelector('button')?.addEventListener('click', () => {
+          const open = !li.classList.contains('open');
+          groups.forEach((s2, l2) => { l2.classList.remove('open'); s2.forEach((x) => x.classList.remove('show')); });
+          if (open) { li.classList.add('open'); subs.forEach((x) => x.classList.add('show')); }
+        });
+      });
       // 목차 접기: « 버튼으로 사이드바 전체를 접기
       const layout = root.querySelector('.detail-layout');
       const fold = root.querySelector<HTMLButtonElement>('.toc-fold');
