@@ -34,9 +34,16 @@ links:
 ---
 ## 개발 방식: AI를 개발 도구로 활용
 
-**방식** — 출시 준비 단계부터는 Unity MCP로 Claude를 Unity 에디터에 직접 연결해 개발했습니다. 씬·컴포넌트 조회, 스크립트 작성과 리팩터링, 감사용 에디터 툴 제작에 활용했으며, 아래 작업 중 상태 흐름 전수 조사, 최적화 감사, QA 자동화와 전역 매니저 점검이 이 방식으로 만들어졌습니다.
+출시 준비 단계부터 Unity MCP로 Claude를 Unity 에디터에 직접 연결해 개발했습니다. 작업마다 AI에 맡길 일과 직접 판단할 일을 나누고, 결과를 따로 검증했습니다.
 
-**검증** — AI 결과물을 그대로 믿지 않았습니다. 도구를 사용하며 발견한 한계(중복 메서드 오탐, 코드 실행 기능 미동작, 파일 해시 불일치 시 편집 실패)를 문서로 정리하고, 어떤 작업을 AI에 맡기고 어떤 작업은 직접 확인할지 기준을 세워 작업 원칙으로 정리했습니다. 규모가 큰 수정은 작성한 에이전트와 분리된 서브에이전트를 따로 띄워, 버그 가능성·기존 구조와의 일관성·성능 영향 등 여러 관점에서 같은 코드를 다시 검토하게 했습니다. Claude가 제안한 수정도 기존 구조와 맞는지 먼저 검토하고, 프로젝트의 다른 시스템과 같은 패턴을 따르도록 직접 조정했습니다.
+| 작업 | Claude에게 맡긴 일 | 직접 판단한 일 | 검증 방법 |
+|---|---|---|---|
+| 회차 구조 개편 | 상태 변수 약 130개의 사용처 전수 조사, 점검 도구 제작 | 새 구조 설계(장소 기준 씬 재구성, 상태의 단일 원천) | 프레임 수 추측·생성 순서 의존 코드를 찾아 이벤트·실행 순서로 교체 |
+| 시작 시 멈춤 제거 | 원인 코드 분석, 개선안 비교, A/B 측정 도구 제작 | 멈춤을 옮기기만 하는 안을 버리고 미리 그린 이미지 방식 선택 | 같은 빌드에서 원본·개선 각 3회 측정, 픽셀 단위 결과 비교 |
+| 설치 용량 감축 | 빌드 리포트와 이미지 설정 교차 분석, 일괄 변환 도구 제작 | 그림이 바뀌는 안·메모리가 느는 안을 버리고 투명 여백 방식 선택 | 137장 시범 적용 → 전체 적용, 원본과 수치 비교 |
+| QA 자동화 | 시트 분류·수정·검증·빌드 절차 실행 | 번역·아트·사운드 제외 규칙, 애매한 행은 질문으로 남기는 기준 | 스모크 테스트 러너, PR 검토 후 병합 |
+
+**원칙** — 도구를 쓰며 발견한 한계(중복 메서드 오탐, 코드 실행 기능 미동작, 파일 해시 불일치 시 편집 실패)를 문서로 정리해 두었습니다. 규모가 큰 수정은 작성한 에이전트와 분리된 서브에이전트를 띄워 버그 가능성·기존 구조와의 일관성·성능 영향을 다시 검토하게 했고, 최종 반영 전에는 프로젝트의 다른 시스템과 같은 패턴인지 직접 확인했습니다.
 
 **결과** — 반복적인 감사·리팩터링 작업은 AI에 맡기고, 구조 설계와 최종 검증에 시간을 집중할 수 있었습니다.
 
@@ -251,7 +258,7 @@ public bool IsHiddenEndingConditionMet()
 | 시작 직후 두 번째 프레임 | 766ms | 425ms | −44% |
 | 노이즈 이미지 메모리 | 16MB | 4MB | −75% |
 
-*i7-13700F / RTX 5060, Development 빌드, 1920×1080 기준*
+*i7-13700F / RTX 5060, Development 빌드, 1920×1080 기준. 출시(Release) 빌드와 저사양 PC에서는 다시 측정하지 않아 수치가 다를 수 있습니다.*
 
 **메모리** — 노이즈는 2048×2048 크기라, 원본처럼 RGBA32(픽셀당 4바이트)로 만들면 16MB입니다. 실제로 쓰는 값은 한 채널뿐이라 R8(픽셀당 1바이트)로 베이크해 4MB로 줄였고, 결과가 원본의 R 채널과 같은지 검증했습니다. 텍스처의 Read/Write도 꺼서 빌드에 CPU 쪽 사본(4MB)이 남지 않게 했습니다.
 
@@ -365,6 +372,8 @@ public class BuildConfig : ScriptableObject
 
 Claude가 Unity MCP로 에디터를 조작해 QA 시트를 처리하는 절차를 **스킬과 런북 문서**로 고정하고, 매일 정해진 시각에 정기 작업으로 실행되게 했습니다. 에디터 쪽에는 그 작업이 호출할 메뉴(`QAAutoBuild`)를 만들었습니다.
 
+<figure class="flow"><svg viewBox="0 0 910 268" role="img" aria-label="QA 자동화 흐름: QA 시트 새 행부터 시트에 결과 기록까지" style="width:100%;height:auto;font-family:inherit"><rect x="20" y="46" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="95.0" y="69" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">QA 시트</text><text x="95.0" y="88" text-anchor="middle" font-size="12" style="fill:var(--muted)">새 행 추가</text><rect x="200" y="46" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="275.0" y="69" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">감지</text><text x="275.0" y="88" text-anchor="middle" font-size="12" style="fill:var(--muted)">3시간 수정 없음</text><line x1="173" y1="74.0" x2="197" y2="74.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="197.0,74.0 189.0,69.0 189.0,79.0" style="fill:var(--muted)"/><rect x="380" y="46" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="455.0" y="69" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">Preflight</text><text x="455.0" y="88" text-anchor="middle" font-size="12" style="fill:var(--muted)">플레이·컴파일·씬·git</text><line x1="353" y1="74.0" x2="377" y2="74.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="377.0,74.0 369.0,69.0 369.0,79.0" style="fill:var(--muted)"/><rect x="560" y="46" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="635.0" y="69" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">브랜치</text><text x="635.0" y="88" text-anchor="middle" font-size="12" style="fill:var(--muted)">qa-auto/MMDD</text><line x1="533" y1="74.0" x2="557" y2="74.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="557.0,74.0 549.0,69.0 549.0,79.0" style="fill:var(--muted)"/><rect x="740" y="46" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--accent)" stroke-width="2"/><text x="815.0" y="69" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">분류 · 수정</text><text x="815.0" y="88" text-anchor="middle" font-size="12" style="fill:var(--muted)">Claude + Unity MCP</text><line x1="713" y1="74.0" x2="737" y2="74.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="737.0,74.0 729.0,69.0 729.0,79.0" style="fill:var(--muted)"/><rect x="740" y="176" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="815.0" y="199" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">스모크 검증</text><text x="815.0" y="218" text-anchor="middle" font-size="12" style="fill:var(--muted)">QASmokeRunner</text><rect x="560" y="176" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--accent)" stroke-width="2"/><text x="635.0" y="199" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">커밋 · PR</text><text x="635.0" y="218" text-anchor="middle" font-size="12" style="fill:var(--muted)">작업 중 파일 제외</text><line x1="737" y1="204.0" x2="713" y2="204.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="713.0,204.0 721.0,209.0 721.0,199.0" style="fill:var(--muted)"/><rect x="380" y="176" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="455.0" y="199" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">빌드 · zip</text><text x="455.0" y="218" text-anchor="middle" font-size="12" style="fill:var(--muted)">build_result.json</text><line x1="557" y1="204.0" x2="533" y2="204.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="533.0,204.0 541.0,209.0 541.0,199.0" style="fill:var(--muted)"/><rect x="200" y="176" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="275.0" y="199" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">Drive 업로드</text><text x="275.0" y="218" text-anchor="middle" font-size="12" style="fill:var(--muted)">동기화 폴더</text><line x1="377" y1="204.0" x2="353" y2="204.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="353.0,204.0 361.0,209.0 361.0,199.0" style="fill:var(--muted)"/><rect x="20" y="176" width="150" height="56" rx="10" style="fill:var(--surface);stroke:var(--border)" stroke-width="1.5"/><text x="95.0" y="199" text-anchor="middle" font-size="15" font-weight="700" style="fill:var(--text)">시트에 기록</text><text x="95.0" y="218" text-anchor="middle" font-size="12" style="fill:var(--muted)">결과 · 원인 · 링크</text><line x1="197" y1="204.0" x2="173" y2="204.0" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="173.0,204.0 181.0,209.0 181.0,199.0" style="fill:var(--muted)"/><line x1="815.0" y1="105" x2="815.0" y2="173" style="stroke:var(--muted)" stroke-width="1.6"/><polygon points="815.0,173.0 820.0,165.0 810.0,165.0" style="fill:var(--muted)"/><text x="890" y="32" text-anchor="end" font-size="12" style="fill:var(--accent-text)">애매하면 고치지 않고 "확인 필요" + 질문</text><text x="635.0" y="254" text-anchor="middle" font-size="12" style="fill:var(--accent-text)">사람이 검토 후 병합</text></svg><figcaption>매일 정기 실행되는 QA 흐름 — 주황 테두리는 사람이 판단하는 지점</figcaption></figure>
+
 - **감지** — 시트 파일이 3시간 동안 수정되지 않았을 때만 처리. QA가 작성 중인 시트는 건드리지 않음
 - **Preflight** — 플레이 중·컴파일 중·저장 안 된 씬·git 상태를 검사해 하나라도 걸리면 그날은 건너뜀
 - **분류 규칙** — 수정 / 아트 패스 / 사운드 패스 / UI·리소스 필요 / 확인 필요. 번역·아트·사운드는 건드리지 않고, 확신이 없으면 고치지 않고 질문을 남김
@@ -409,6 +418,8 @@ public static void GitCommit()
 |---|---|
 | QA 시트 4행 | 수정 2 · 아트 패스 1 · 사운드 패스 1, 빌드 2.8GB 업로드까지 515초 |
 | QA 시트 20행 | 수정 9, 나머지 전부 분류·원인 기록 |
+
+*정기 실행 2회차 결과 기준. 아직 회차가 적어 자동 수정 비율은 시트 내용에 따라 달라질 수 있습니다.*
 
 **아쉬운 점** — 지금 구조는 PC 한 대에서 Unity 에디터가 켜져 있어야 동작합니다. 팀이 커지거나 빌드가 잦아지면 빌드는 CI 서버(Jenkins 등)에서 batchmode로 돌리고, Claude는 시트 분류·수정 단계만 맡도록 나누는 것이 맞습니다. 또 스모크 러너는 멈춤·에러·검은 화면 같은 기계적인 문제만 잡기 때문에, 연출 타이밍이나 문장의 어색함은 여전히 사람이 확인합니다.
 
@@ -551,43 +562,51 @@ private void OnLine(Subtitle subtitle)
 
 </details>
 
-## 7. 가방 · 수첩 UI
+## 7. 플레이 화면 — UI · 퍼즐 · 기믹
 
-메뉴·인벤토리·수첩·지도·파우치 5개 화면이 Spine 연출로 전환되는 가방 UI와, 셰이더로 책장을 넘기는 수첩을 만들었습니다. 화면 전환·입력 잠금을 한 매니저가 관리하고, 대화 중 아이템 제출, 미확인 항목 느낌표 배지, 아이템·퀘스트 알림 큐를 함께 구현했습니다.
+장면마다 조작 방식이 다른 UI와 퍼즐, 기믹을 만들었습니다. 스포일러를 피하기 위해 장면과 인물은 밝히지 않습니다. 이 밖에 아이템을 끌어 대상에 사용하는 드래그 앤 드롭 퍼즐 여러 종을 공통 구조로 만들었습니다.
 
-<img src="/images/killa-note-suspect.gif" alt="수첩 — 용의자에 대하여(목록 → 안젤라 → 스티커 상세)와 사건에 대하여(Day 3 · 4 → 사건 페이지 넘기기)" loading="lazy" decoding="async" />
+### 7-1. 가방 · 수첩 UI
 
-*수첩의 '용의자에 대하여'(목록 → 안젤라 → 스티커 상세)와 '사건에 대하여'(Day 3 · 4 → 사건 페이지 넘기기)*
+메뉴·인벤토리·수첩·지도·파우치 5개 화면이 Spine 연출로 전환되는 가방 UI와 셰이더로 책장을 넘기는 수첩. 화면 전환·입력 잠금을 한 매니저가 관리하고, 대화 중 아이템 제출, 미확인 항목 느낌표 배지, 알림 큐를 함께 구현
 
-## 8. 퍼즐 · 기믹
+<img src="/images/killa-note-suspect.gif" alt="수첩 — 용의자에 대하여와 사건에 대하여" loading="lazy" decoding="async" />
 
-장면마다 조작 방식이 다른 퍼즐과 기믹을 만들었습니다. 스포일러를 피하기 위해 장면과 인물은 밝히지 않습니다.
+### 7-2. 두 세계 전환
 
-**두 세계 전환** — 겹쳐 있는 두 세계를 버튼 하나로 오가며 렌더링·충돌·레이캐스트를 함께 전환
+겹쳐 있는 두 세계를 버튼 하나로 오가며 렌더링·충돌·레이캐스트를 함께 전환
 
 <img src="/images/killa-two-worlds.gif" alt="두 세계 전환" loading="lazy" decoding="async" />
 
-**중력 반전 이동** — 발사 구역에서 쏘아 올려 천장을 바닥처럼 걷는 이동
+### 7-3. 중력 반전 이동
+
+발사 구역에서 쏘아 올려 천장을 바닥처럼 걷는 이동
 
 <img src="/images/killa-gravity.gif" alt="중력 반전 이동" loading="lazy" decoding="async" />
 
-**체스말 퍼즐** — 체스말의 이동 규칙대로 말을 옮겨 길을 찾는 퍼즐, 틀린 수는 연출과 함께 초기화
+### 7-4. 체스말 퍼즐
+
+체스말의 이동 규칙대로 말을 옮겨 길을 찾는 퍼즐, 틀린 수는 연출과 함께 초기화
 
 <img src="/images/killa-chess-puzzle.gif" alt="체스말 퍼즐" loading="lazy" decoding="async" />
 
-**진실의 필름 퍼즐** — 인물의 필름 장면을 넘겨 보며 질문에 맞는 장면을 골라 필름 릴을 채우는 추리 퍼즐
+### 7-5. 진실의 필름 퍼즐
+
+인물의 필름 장면을 넘겨 보며 질문에 맞는 장면을 골라 필름 릴을 채우는 추리 퍼즐
 
 <img src="/images/killa-film-puzzle.gif" alt="진실의 필름 퍼즐" loading="lazy" decoding="async" />
 
-**간수 이동 경로 퍼즐** — 같은 색 점을 이어 모든 칸을 채우는 경로 퍼즐, 보드가 바뀔 때마다 판정하고 상태머신으로 정답을 한 번만 처리
+### 7-6. 간수 이동 경로 퍼즐
+
+같은 색 점을 이어 모든 칸을 채우는 경로 퍼즐, 보드가 바뀔 때마다 판정하고 상태머신으로 정답을 한 번만 처리
 
 <img src="/images/killa-guard-route.gif" alt="간수 이동 경로 퍼즐" loading="lazy" decoding="async" />
 
-**공명 시스템** — 상징을 끌어 다른 상징에 놓으면 선을 따라 합쳐지며 새 상징이 나오는 조합 UI, 조합 결과는 ScriptableObject 데이터로 정의
+### 7-7. 공명 시스템
+
+상징을 끌어 다른 상징에 놓으면 선을 따라 합쳐지며 새 상징이 나오는 조합 UI, 조합 결과는 ScriptableObject 데이터로 정의
 
 <img src="/images/killa-symbol-fx.webp" alt="공명 시스템" loading="lazy" decoding="async" />
-
-**드래그 앤 드롭 퍼즐** — 아이템을 끌어 대상에 사용하는 퍼즐 여러 종을 공통 구조로 제작
 
 ## 전시 이력 — 30회 이상 · 5개국
 

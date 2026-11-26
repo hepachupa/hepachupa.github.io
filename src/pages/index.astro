@@ -280,6 +280,7 @@ const updated = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
     const progress = $('#modal-progress')!;
     let heads: HTMLElement[] = [];
     let tocBtns: HTMLElement[] = [];
+    let tocGroups = new Map<string, HTMLElement[]>();
     let docTitle = '';
     const headLabel = (h: HTMLElement) => {
       const c = h.cloneNode(true) as HTMLElement;
@@ -331,6 +332,8 @@ const updated = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
         const b = tocBtns.find((x) => x.closest('.toc') && x.dataset.toc === parentH2?.id);
         if (b) { b.classList.add('is-active'); shown = b; }
       }
+      const openGroup = active ? heads.slice(0, heads.indexOf(active) + 1).filter((h) => h.tagName === 'H2').pop()?.id : undefined;
+      tocGroups.forEach((lis, id) => lis.forEach((li) => li.classList.toggle('show', id === openGroup)));
       if (shown) keepVisible(shown);
       where.replaceChildren();
       if (docTitle) {
@@ -347,6 +350,22 @@ const updated = `${now.getFullYear()}년 ${now.getMonth() + 1}월`;
       tocBtns = $$<HTMLElement>('[data-toc]', root);
       docTitle = root.classList.contains('has-toc') ? (root.dataset.title ?? '') : '';
       tocBtns.forEach((b) => b.addEventListener('click', () => goTo(heads.find((h) => h.id === b.dataset.toc))));
+      // 목차 접기: 작은 제목(3단계)은 지금 읽는 장만 펼치고, 사이드바 전체도 접을 수 있게
+      tocGroups = new Map();
+      let cur: string | null = null;
+      $$<HTMLElement>('.toc li', root).forEach((li) => {
+        const id = (li.querySelector('[data-toc]') as HTMLElement | null)?.dataset.toc ?? '';
+        if (li.classList.contains('d2')) { cur = id; tocGroups.set(id, []); }
+        else if (cur) tocGroups.get(cur)!.push(li);
+      });
+      const layout = root.querySelector('.detail-layout');
+      const fold = root.querySelector<HTMLButtonElement>('.toc-fold');
+      const setMin = (on: boolean) => {
+        layout?.classList.toggle('toc-min', on);
+        if (fold) { fold.textContent = on ? '»' : '«'; fold.setAttribute('aria-label', on ? '목차 펼치기' : '목차 접기'); fold.title = fold.getAttribute('aria-label')!; }
+      };
+      setMin(store.get('tocMin') === '1');
+      fold?.addEventListener('click', () => { const on = !layout?.classList.contains('toc-min'); setMin(on); store.set('tocMin', on ? '1' : '0'); });
       if (root.classList.contains('has-toc')) {
         heads.filter((h) => h.tagName === 'H2').slice(1).forEach((h) => {
           const b = document.createElement('button');

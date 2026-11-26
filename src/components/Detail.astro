@@ -41,7 +41,7 @@ const facts: [string, string | undefined][] = [
 <div class:list={['detail-layout', { on: hasToc }]}>
   {hasToc && (
     <nav class="toc" aria-label="목차">
-      <p class="toc-title">목차</p>
+      <div class="toc-head"><p class="toc-title">목차</p><button type="button" class="toc-fold" aria-label="목차 접기" title="목차 접기">«</button></div>
       <ol>
         {toc.map((t) => (
           <li class:list={[`d${t.depth}`, { code: t.code }]}>

@@ -455,3 +455,19 @@ details.highlights.fold > ul { padding: 0 18px 14px 36px; }
   .prose p.lead-label { display: block; border: 0; padding: 0; margin: 0 0 10px; }
   .prose p.lead-label + ul, .prose p.lead-label + ol { padding-left: 22px; margin: 0 0 12px; }
 }
+
+/* 본문 흐름도 (인라인 SVG) */
+.prose figure.flow { margin: 18px 0 22px; padding: 14px 12px 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
+.prose figure.flow figcaption { margin-top: 6px; font-size: 13px; color: var(--muted); text-align: center; }
+
+/* 목차 접기: 작은 제목은 지금 읽는 장만, 사이드바는 « 버튼으로 접기 */
+.toc-head { display: flex; align-items: center; justify-content: space-between; margin: 0 4px 8px 10px; }
+.toc-head .toc-title { margin: 0; }
+.toc-fold { min-width: 28px; height: 26px; padding: 0 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; }
+.toc-fold:hover { color: var(--text); border-color: var(--accent); }
+.toc li.d3 { display: none; }
+.toc li.d3.show { display: block; }
+.detail-layout.on.toc-min { grid-template-columns: 36px minmax(0, 1fr); gap: 20px; }
+.toc-min .toc ol, .toc-min .toc-title { display: none; }
+.toc-min .toc-head { margin: 0; justify-content: center; }
+@media (max-width: 900px) { .toc-head { display: none; } .toc li.d3.show { display: none; } .detail-layout.on.toc-min { grid-template-columns: minmax(0, 1fr); } .toc-min .toc ol { display: flex; } }
