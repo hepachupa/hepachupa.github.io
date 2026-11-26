@@ -10,7 +10,7 @@ const kind: Kind = item.kind;
 const { Content, headings } = await render(item);
 
 // 목차: 본문의 큰 제목(##)·작은 제목(###) — "3-2. 제목 — 결과" 형식에서 번호·결과를 분리
-const toc = headings.filter((h) => h.depth === 2).map((h) => {
+const toc = headings.filter((h) => h.depth === 2 || h.depth === 3).map((h) => {
   let title = h.text;
   const m = title.match(/^(\d+(?:-\d+)*)\.\s+/);
   const num = m ? m[1] : '';
@@ -22,7 +22,7 @@ const toc = headings.filter((h) => h.depth === 2).map((h) => {
   if (code) title = title.replace(/^코드:\s*/, '');
   return { ...h, num, title, badge: code ? '' : badge, code };
 });
-const hasToc = kind === 'project' && toc.length >= 4;
+const hasToc = kind === 'project' && toc.length >= 6;
 const metrics = (d.metrics ?? []).map((m: any) => {
   const h = m.target ? toc.find((t) => t.num === m.target) ?? toc.find((t) => t.text.startsWith(m.target)) : undefined;
   return { ...m, slug: h?.slug, to: h ? (h.num ? `${h.num} ${h.title}` : h.title) : '' };
