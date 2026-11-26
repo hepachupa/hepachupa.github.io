@@ -80,6 +80,8 @@ links:
 
 **아쉬운 점** — 일괄 변환이라 새 이미지가 같은 문제를 다시 만들 수 있습니다. 임포트 시 크기를 검사하는 `AssetPostprocessor`가 재발을 막는 방법입니다.
 
+**Addressables** — 5개 언어 Localization에 사용 중입니다. 상시 로드 리소스로 확장하는 것은 약 15MB로 측정돼 이득이 작아 출시 전 도입을 보류했습니다.
+
 <details class="code-fold">
 <summary>시각 자료 보기 — 원본 · 압축 결과 비교</summary>
 
@@ -306,6 +308,8 @@ public bool IsHiddenEndingConditionMet()
 
 ## 3. 개발 툴
 
+기획·사운드·QA가 프로그래머를 기다리지 않고 직접 확인·수정할 수 있게 만든 도구입니다.
+
 ### 3-1. 엔딩 분기 QA 툴
 
 엔딩 판정을 순서가 곧 우선순위인 Lua 규칙 목록(`EndingRuleSet`)으로 만들고, 엔딩 경로를 프리셋으로 정의했습니다. QA는 F9 한 번으로 원하는 엔딩 지점에 이동하고, 규칙별 참/거짓으로 판정 원인을 바로 확인합니다. 에디터 창과 QA 빌드 오버레이 모두에서 쓰며, 출시 빌드에는 포함되지 않습니다(`DEBUG_QA`).
@@ -434,6 +438,12 @@ private void OnLine(Subtitle subtitle)
 ```
 
 </details>
+
+**사건 데이터 CSV 연동** — 수첩 사건 데이터(ScriptableObject)를 Excel용 CSV로 내보내고, 수정한 CSV를 Undo 가능한 형태로 다시 가져옵니다.
+
+**그 밖의 에디터 툴** — 씬 최적화 점검 `SceneOptimAudit`, 전역 변수 감사 `GlobalVarAuditor`, 빌드 용량 분석 `BuildSizeAudit`, 텍스처 일괄 압축 `TextureCompressTool`, 시작 성능 측정 `StartupPerfRunner`, 스모크 테스트 `QASmokeRunner`
+
+**외부 SDK 연동** — Steamworks, FMOD, Spine, Dialogue System(Lua)
 
 ## 4. 플레이 화면
 
