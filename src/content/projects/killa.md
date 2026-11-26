@@ -496,9 +496,9 @@ private void OnLine(Subtitle subtitle)
 5개국 30회 이상 전시했습니다.
 
 <div class="expo">
-<div class="expo-r"><div class="expo-k">일본</div><div class="expo-chips"><span class="chip on"><b>도쿄게임쇼</b><span class="y">24 · 25 · 26</span> · Selected Indie 80</span><span class="chip">BitSummit<span class="y">24 · 26</span></span><span class="chip">Tokyo Indie Games Summit<span class="y">25</span></span></div></div>
-<div class="expo-r"><div class="expo-k">독일</div><div class="expo-chips"><span class="chip on"><b>gamescom</b><span class="y">24</span> · Indie Arena Booth</span><span class="chip">ANIMAGIC</span></div></div>
+<div class="expo-r"><div class="expo-k">일본</div><div class="expo-chips"><span class="chip">도쿄게임쇼<span class="y">24 · 25 · 26</span> · Selected Indie 80</span><span class="chip">BitSummit<span class="y">24 · 26</span></span><span class="chip">Tokyo Indie Games Summit<span class="y">25</span></span></div></div>
+<div class="expo-r"><div class="expo-k">독일</div><div class="expo-chips"><span class="chip">gamescom<span class="y">24</span> · Indie Arena Booth</span><span class="chip">ANIMAGIC</span></div></div>
 <div class="expo-r"><div class="expo-k">대만</div><div class="expo-chips"><span class="chip">Taipei Game Show<span class="y">25</span></span></div></div>
 <div class="expo-r"><div class="expo-k">미국</div><div class="expo-chips"><span class="chip">LA COMIC-CON</span></div></div>
-<div class="expo-r"><div class="expo-k">국내</div><div class="expo-chips"><span class="chip">G-STAR<span class="y">23 · 24 · 26</span></span><span class="chip">BIC<span class="y">23 · 26</span></span><span class="chip on"><b>버닝비버</b><span class="y">23 · 24</span> · 2년 연속 올해의 버닝비버</span><span class="chip">플레이엑스포<span class="y">24</span></span><span class="chip">Unite Seoul<span class="y">26</span></span></div></div>
+<div class="expo-r"><div class="expo-k">국내</div><div class="expo-chips"><span class="chip">G-STAR<span class="y">23 · 24 · 26</span></span><span class="chip">BIC<span class="y">23 · 26</span></span><span class="chip">버닝비버<span class="y">23 · 24</span> · 2년 연속 올해의 버닝비버</span><span class="chip">플레이엑스포<span class="y">24</span></span><span class="chip">Unite Seoul<span class="y">26</span></span></div></div>
 </div>
